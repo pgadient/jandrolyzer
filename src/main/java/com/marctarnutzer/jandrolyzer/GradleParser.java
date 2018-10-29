@@ -1,3 +1,10 @@
+//
+//  This file is part of jandrolyzer.
+//
+//  Created by Marc Tarnutzer on 05.10.2018.
+//  Copyright © 2018 Marc Tarnutzer. All rights reserved.
+//
+
 package com.marctarnutzer.jandrolyzer;
 
 import org.codehaus.groovy.ast.ASTNode;
@@ -42,6 +49,7 @@ public class GradleParser extends CodeVisitorSupport {
             astNodes = astBuilder.buildFromString(gradleSrc);
         } catch (Exception e) {
             System.out.println("Error: " + e);
+            System.out.println("Path: " + pathToGradle);
             return this.foundLibraries;
         }
 
@@ -92,11 +100,14 @@ public class GradleParser extends CodeVisitorSupport {
 
     @Override
     public void visitMethodCallExpression(MethodCallExpression methodCallExpression) {
-        if (methodCallExpression.getMethodAsString().equals("compileSdkVersion")) {
-            String sdkVersion = methodCallExpression.getArguments().getText();
-            this.foundLibraries.put("android.core", sdkVersion.substring(1, sdkVersion.length() - 1));
-        }
+        String methodString = methodCallExpression.getMethodAsString();
+        if (methodString != null) {
+            if (methodCallExpression.getMethodAsString().equals("compileSdkVersion")) {
+                String sdkVersion = methodCallExpression.getArguments().getText();
+                this.foundLibraries.put("android.core", sdkVersion.substring(1, sdkVersion.length() - 1));
+            }
 
+        }
         super.visitMethodCallExpression(methodCallExpression);
     }
 

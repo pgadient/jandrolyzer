@@ -1,3 +1,10 @@
+//
+//  This file is part of jandrolyzer.
+//
+//  Created by Marc Tarnutzer on 26.09.2018.
+//  Copyright © 2018 Marc Tarnutzer. All rights reserved.
+//
+
 package com.marctarnutzer.jandrolyzer;
 
 import com.github.javaparser.ast.CompilationUnit;
@@ -10,6 +17,7 @@ import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.printer.DotPrinter;
 import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.types.ResolvedType;
+import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.utils.SymbolSolverCollectionStrategy;
 import com.github.javaparser.utils.ParserCollectionStrategy;
@@ -107,7 +115,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("CertPinningSSLSocketFactory.java")) {
+                        if (name.equals("BaseSuggestionsModel.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -116,7 +124,7 @@ public class ProjectAnalyzer implements Runnable {
                                 e.printStackTrace();
                             }
                         } else {
-                            System.out.println(name);
+                            //System.out.println(name);
                         }
                     }
 
@@ -153,6 +161,11 @@ public class ProjectAnalyzer implements Runnable {
                 // Check if another version of that library exists and add that one
                 File librariesRootFolder = new File(this.libraryFolderPath);
                 File[] libraryFolders = librariesRootFolder.listFiles();
+
+                if (libraryFolders == null) {
+                    return;
+                }
+
                 Arrays.sort(libraryFolders);
                 for (File file : libraryFolders) {
                     if (file.getName().contains(entry.getKey())) {
@@ -267,6 +280,8 @@ public class ProjectAnalyzer implements Runnable {
                     if (typeString != null) {
                         if (typeString.equals("okhttp3.Request.Builder")) {
                             saveSnippet(path, name, "com.squareup.okhttp3", typeString, node);
+                        } else if (typeString.equals("com.squareup.okhttp.Request.Builder")) {
+                            saveSnippet(path, name, "com.squareup.okhttp", typeString, node);
                         } else if (typeString.equals("retrofit.Retrofit.Builder")
                                 || typeString.equals("retrofit2.Retrofit.Builder")
                                 || typeString.equals("retrofit.RestAdapter.Builder")
@@ -297,10 +312,12 @@ public class ProjectAnalyzer implements Runnable {
             switch(((MethodCallExpr) node).getName().asString()) {
                 case "openConnection": case "openStream": // Libraries: java.net.HttpURLConnection, java.net.URLConnection
                     typeString = estimateType((Expression) node);
-                    if (typeString.equals("java.net.URLConnection")) {
-                        saveSnippet(path, name, "java.net.URLConnection", typeString, node);
-                    } else if (typeString.equals("java.net.HttpURLConnection")) {
-                        saveSnippet(path, name, "java.net.HttpURLConnection", typeString, node);
+                    if (typeString != null) {
+                        if (typeString.equals("java.net.URLConnection")) {
+                            saveSnippet(path, name, "java.net.URLConnection", typeString, node);
+                        } else if (typeString.equals("java.net.HttpURLConnection")) {
+                            saveSnippet(path, name, "java.net.HttpURLConnection", typeString, node);
+                        }
                     }
                     break;
                 case "execute": // Libraries: org.apache.httpcomponents, android.net.http
@@ -344,7 +361,7 @@ public class ProjectAnalyzer implements Runnable {
                             } else if (scopeType.equals("com.koushikdutta.ion.Ion")) {
                                 saveSnippet(path, name, "com.koushikdutta.ion", scopeType, node);
                             } else {
-                                System.out.println("Different scope type: " + scopeType);
+                                //System.out.println("Different scope type: " + scopeType);
                             }
                         }
                     }
@@ -361,8 +378,10 @@ public class ProjectAnalyzer implements Runnable {
                             case "openConnection": case "openStream":
                                 String methodCallType = estimateType(((CastExpr) node).getExpression());
                                 String castType = estimateType((Expression) node);
-                                if (methodCallType.equals("java.net.URLConnection")) {
-                                    saveSnippet(path, name, castType, castType, node);
+                                if (methodCallType != null) {
+                                    if (methodCallType.equals("java.net.URLConnection")) {
+                                        saveSnippet(path, name, castType, castType, node);
+                                    }
                                 }
                         }
                     }
@@ -400,37 +419,37 @@ public class ProjectAnalyzer implements Runnable {
     private String estimateType(Expression expr) {
         String typeString = null;
 
-        System.out.println("Code: " + expr.toString());
+        //System.out.println("Code: " + expr.toString());
 
         try {
             if (expr instanceof MethodCallExpr) {
                 ResolvedType resolvedType = expr.calculateResolvedType();
                 typeString = resolvedType.asReferenceType().getQualifiedName();
 
-                System.out.println("[RESOLVED] MethodCallExpr was resolved to: " + typeString);
+                //System.out.println("[RESOLVED] MethodCallExpr was resolved to: " + typeString);
             } else if (expr instanceof ObjectCreationExpr) {
                 ResolvedType resolvedType = expr.calculateResolvedType();
                 typeString = resolvedType.asReferenceType().getQualifiedName();
 
-                System.out.println("[RESOLVED] ObjectCreationExpr was resolved to: " + typeString);
+                //System.out.println("[RESOLVED] ObjectCreationExpr was resolved to: " + typeString);
             } else if (expr instanceof  CastExpr) {
                 typeString = expr.calculateResolvedType().asReferenceType().getQualifiedName();
 
-                System.out.println("[RESOLVED] CastExpr was resolved to: " + typeString);
+                //System.out.println("[RESOLVED] CastExpr was resolved to: " + typeString);
             } else if (expr instanceof NameExpr) {
                 ResolvedType resolvedType = expr.calculateResolvedType();
                 typeString = resolvedType.asReferenceType().getQualifiedName();
 
-                System.out.println("[RESOLVED] NameExpr was resolved to : " + typeString);
+                //System.out.println("[RESOLVED] NameExpr was resolved to : " + typeString);
             } else {
-                System.out.println("Expression is a: " + expr.getClass());
+                //System.out.println("Expression is a: " + expr.getClass());
             }
         } catch (UnsolvedSymbolException e) {
             typeString = e.getName();
-            System.out.println("[NOT RESOLVED] was no resolved but estimated to type: " + typeString + " Exception: " + e);
+            //System.out.println("[NOT RESOLVED] was no resolved but estimated to type: " + typeString + " Exception: " + e);
         }  catch (Exception e) {
             typeString = null;
-            System.out.println("[NOT RESOLVED] Exception: " + e);
+            //System.out.println("[NOT RESOLVED] Exception: " + e);
         }
 
         return typeString;
@@ -468,6 +487,7 @@ public class ProjectAnalyzer implements Runnable {
     @Override
     public void run() {
         analyze();
+        JavaParserFacade.clearInstances();
         System.out.println("Processed: " + projects.size() + " of " + totalProjects);
         latch.countDown();
         concAnalyzers.release();

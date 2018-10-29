@@ -1,15 +1,65 @@
+//
+//  This file is part of jandrolyzer.
+//
+//  Created by Marc Tarnutzer on 26.09.2018.
+//  Copyright © 2018 Marc Tarnutzer. All rights reserved.
+//
+
 package com.marctarnutzer.jandrolyzer;
 
 import java.io.*;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 
+import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
+
 public class Main {
+    @Parameter(names = {"--project_path", "-pp"}, description = "Scan a single projects folder", variableArity = true)
+    private static List<String> projectPath = new ArrayList<>();
+
+    @Parameter(names = {"--projects_path", "-psp"}, description = "Scan a folder containing multiple projects", variableArity = true)
+    private static List<String> projectsPath = new ArrayList<>();
+
+    @Parameter(names = {"--libraries_path", "-lp"}, description = "Location of libraries", required = true)
+    private static List<String> librariesPath = new ArrayList<>();
+
+    @Parameter(names = {"--multithreaded", "-m"}, description = "Scan multiple projects at once")
+    private static boolean multithreaded = false;
 
     // HashSet not ordered according to insertion order
     static HashMap<String, HashSet<String>> libraries = new HashMap<String, HashSet<String>>();
+
+    public static void main(String args[]) {
+        initLibraries();
+
+        Main main = new Main();
+        JCommander.newBuilder().addObject(main).build().parse(args);
+
+        if (!projectPath.isEmpty()) {
+            analyzeSingleProject(argToPath(projectPath), argToPath(librariesPath));
+        } else if (!projectsPath.isEmpty()) {
+            analyzeMultipleProjects(argToPath(projectsPath), argToPath(librariesPath));
+        }
+
+        System.out.println("All done!");
+    }
+
+    private static String argToPath(List<String> arg) {
+        StringBuilder stringBuilder = new StringBuilder();
+
+        for (String partPath : arg) {
+            stringBuilder.append(partPath + " ");
+        }
+
+        String path = stringBuilder.toString().substring(0, stringBuilder.toString().length() - 1);
+
+        if (path.startsWith("\"") && path.endsWith("\"")) {
+            path = path.substring(1, path.length() - 1);
+        }
+
+        return path;
+    }
 
     static void initLibraries() {
         HashSet<String> retrofitCode = new HashSet<String>();
@@ -25,6 +75,9 @@ public class Main {
 
         HashSet<String> retrofitCode2 = new HashSet<String>();
         libraries.put("com.squareup.retrofit2", retrofitCode2);
+
+        HashSet<String> okhttpCode1_2 = new HashSet<String>();
+        libraries.put("com.squareup.okhttp", okhttpCode1_2);
 
         HashSet<String> okhttpCode = new HashSet<String>();
         okhttpCode.add("OkHttpClient");
@@ -131,39 +184,23 @@ public class Main {
         libraries.put("android.core", androidCore);
     }
 
-    public static void main(String args[]) {
-        initLibraries();
-
-        analyzeSingleProject();
-
-        //analyzeMultipleProjects();
-    }
-
-    static void analyzeSingleProject() {
-        String projectPath = "/Volumes/MTDocs/Decompiled APKs/Smapper";
-        String libraryFolderPath = "/Volumes/MTDocs/Libraries";
-
-        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<Project>(1);
+    static void analyzeSingleProject(String projectPath, String librariesPath) {
+        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<>(1);
         CountDownLatch latch = new CountDownLatch(1);
-        Semaphore concAnalyzers = new Semaphore(1);
+        Semaphore concurrentAnalyzers = new Semaphore(1);
 
         try {
-            ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectPath, libraries, projects, latch, 1, concAnalyzers, libraryFolderPath);
+            ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectPath, libraries, projects, latch, 1, concurrentAnalyzers, librariesPath);
             projectAnalyzer.run();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
 
-        System.out.println(projects.peek().minimalStringRepresentation());
-
+        //System.out.println(projects.peek().minimalStringRepresentation());
     }
 
-    static void analyzeMultipleProjects() {
-        //String rootPath = "/Users/marc/Documents/Unibe/Master Thesis/Bern/Sample Apps";
-        String rootPath = "/Volumes/Samsung SSD T5/Master Thesis/All F-Droid Open Source Projects/Internet Permission";
-        String libraryFolderPath = "/Volumes/MTDocs/Libraries";
-
-        File folder = new File(rootPath);
+    static void analyzeMultipleProjects(String projectsPath, String librariesPath) {
+        File folder = new File(projectsPath);
         File[] projectFolders = folder.listFiles(new FileFilter() {
             @Override
             public boolean accept(File pathname) {
@@ -174,31 +211,21 @@ public class Main {
         ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<Project>(projectFolders.length);
         CountDownLatch latch = new CountDownLatch(projectFolders.length);
 
-        /*
-        ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-
-        for (File projectFolder : projectFolders) {
-            try {
-                Runnable projectAnalyzerTask = new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length);
-                executorService.execute(projectAnalyzerTask);
-                System.out.println(projectFolder.getPath());
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
+        Semaphore concurrentAnalyzers;
+        if (multithreaded) {
+            concurrentAnalyzers = new Semaphore(Runtime.getRuntime().availableProcessors());
+        } else {
+            concurrentAnalyzers = new Semaphore(1);
         }
-        */
 
-        //Semaphore concAnalyzers = new Semaphore(Runtime.getRuntime().availableProcessors());
-        Semaphore concAnalyzers = new Semaphore(1);
-
-        ProjectAnalyzer projectAnalyzer;
+        //ProjectAnalyzer projectAnalyzer;
         for (File projectFolder : projectFolders) {
             try {
-                concAnalyzers.acquire();
-                //Thread t = new Thread(new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concAnalyzers));
-                projectAnalyzer = new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concAnalyzers, libraryFolderPath);
+                concurrentAnalyzers.acquire();
+                //Thread thread = new Thread(new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concurrentAnalyzers, librariesPath));
+                //thread.start();
+                ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concurrentAnalyzers, librariesPath);
                 projectAnalyzer.run();
-                //t.start();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (FileNotFoundException e) {
@@ -212,16 +239,12 @@ public class Main {
             e.printStackTrace();
         }
 
-        //executorService.shutdown();
-
         /*
         for (Project project : projects) {
             System.out.println("Project: " + project.minimalStringRepresentation());
         }*/
 
-        saveResults(rootPath, projects);
-
-        System.out.println("All done!");
+        saveResults(projectsPath, projects);
     }
 
     static void saveResults(String path, ArrayBlockingQueue<Project> projects) {
@@ -243,7 +266,7 @@ public class Main {
                 } catch (IOException e) {
                     e.printStackTrace();
                 } catch (NullPointerException e) {
-                    e.printStackTrace();
+                    //e.printStackTrace();
                 }
             }
         }

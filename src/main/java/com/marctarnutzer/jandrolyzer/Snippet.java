@@ -1,3 +1,10 @@
+//
+//  This file is part of jandrolyzer.
+//
+//  Created by Marc Tarnutzer on 26.09.2018.
+//  Copyright © 2018 Marc Tarnutzer. All rights reserved.
+//
+
 package com.marctarnutzer.jandrolyzer;
 
 public class Snippet {
