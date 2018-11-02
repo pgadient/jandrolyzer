@@ -15,12 +15,26 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 
 public class Main {
+    // Scan APK file(s)
+    @Parameter(names = {"--apk_path", "-ap"}, description = "Path to single APK file", variableArity = true)
+    private static List<String> apkPath = new ArrayList<>();
+
+    @Parameter(names = {"--jadx_path", "-jp"}, description = "Path to JADX binary", variableArity = true)
+    private static List<String> jadxPath = new ArrayList<>();
+
+    @Parameter(names = {"--output_path", "-op"}, description = "Decompiled project output path",
+            variableArity = true)
+    private static List<String> outputPath = new ArrayList<>();
+
+    // Scan open source project(s)
     @Parameter(names = {"--project_path", "-pp"}, description = "Scan a single projects folder", variableArity = true)
     private static List<String> projectPath = new ArrayList<>();
 
-    @Parameter(names = {"--projects_path", "-psp"}, description = "Scan a folder containing multiple projects", variableArity = true)
+    @Parameter(names = {"--projects_path", "-psp"}, description = "Scan a folder containing multiple projects",
+            variableArity = true)
     private static List<String> projectsPath = new ArrayList<>();
 
+    // Additional arguments
     @Parameter(names = {"--libraries_path", "-lp"}, description = "Location of libraries", required = true)
     private static List<String> librariesPath = new ArrayList<>();
 
@@ -40,6 +54,12 @@ public class Main {
             analyzeSingleProject(argToPath(projectPath), argToPath(librariesPath));
         } else if (!projectsPath.isEmpty()) {
             analyzeMultipleProjects(argToPath(projectsPath), argToPath(librariesPath));
+        } else if (!apkPath.isEmpty()) {
+            if (jadxPath.isEmpty() || outputPath.isEmpty()) {
+                throw new IllegalArgumentException("Please specify JADX path and output path.");
+            }
+
+            analyzeSingleAPK(argToPath(apkPath), argToPath(jadxPath), argToPath(outputPath));
         }
 
         System.out.println("All done!");
@@ -49,14 +69,16 @@ public class Main {
         StringBuilder stringBuilder = new StringBuilder();
 
         for (String partPath : arg) {
-            stringBuilder.append(partPath + " ");
+            stringBuilder.append(partPath + "\\ ");
         }
 
-        String path = stringBuilder.toString().substring(0, stringBuilder.toString().length() - 1);
+        String path = stringBuilder.toString().substring(0, stringBuilder.toString().length() - 2);
 
+        /*
         if (path.startsWith("\"") && path.endsWith("\"")) {
             path = path.substring(1, path.length() - 1);
         }
+        */
 
         return path;
     }
@@ -182,6 +204,12 @@ public class Main {
         androidCore.add("HttpGet");
         androidCore.add("HttpClient");
         libraries.put("android.core", androidCore);
+    }
+
+    // outputPath specifies the location of the decompiled Android project
+    static void analyzeSingleAPK(String pathToAPK, String pathToJadx, String outputPath) {
+        Decompiler decompiler = new Decompiler(pathToAPK, null, pathToJadx, outputPath);
+        decompiler.startDecompilation();
     }
 
     static void analyzeSingleProject(String projectPath, String librariesPath) {
