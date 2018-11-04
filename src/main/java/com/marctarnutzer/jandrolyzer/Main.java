@@ -19,6 +19,10 @@ public class Main {
     @Parameter(names = {"--apk_path", "-ap"}, description = "Path to single APK file", variableArity = true)
     private static List<String> apkPath = new ArrayList<>();
 
+    @Parameter(names = {"--apks_path", "-asp"}, description = "Path to folder with multiple APK files",
+            variableArity = true)
+    private static List<String> apksPath = new ArrayList<>();
+
     @Parameter(names = {"--jadx_path", "-jp"}, description = "Path to JADX binary", variableArity = true)
     private static List<String> jadxPath = new ArrayList<>();
 
@@ -59,11 +63,20 @@ public class Main {
                 throw new IllegalArgumentException("Please specify JADX path and output path.");
             }
 
-            analyzeSingleAPK(argToPath(apkPath), argToPath(jadxPath), argToPath(outputPath));
+            analyzeSingleAPK(argToPath(apkPath), argToPath(jadxPath), argToPath(outputPath), argToPath(librariesPath));
+        } else if (!apksPath.isEmpty()) {
+            if (jadxPath.isEmpty() || outputPath.isEmpty()) {
+                throw new IllegalArgumentException("Please specify JADX path and output path.");
+            }
+
+            analyzeMultipleAPKs(argToPath(apksPath), argToPath(jadxPath), argToPath(outputPath),
+                    argToPath(librariesPath));
         }
 
         System.out.println("All done!");
     }
+
+
 
     private static String argToPath(List<String> arg) {
         StringBuilder stringBuilder = new StringBuilder();
@@ -81,6 +94,123 @@ public class Main {
         */
 
         return path;
+    }
+
+    static void analyzeMultipleAPKs(String pathToAPKsFolder, String pathToJadx, String outputPath, String librariesPath) {
+        Decompiler decompiler = new Decompiler(null, pathToAPKsFolder, pathToJadx, outputPath);
+        ArrayList<String> projectPathsList = decompiler.startDecompilation();
+
+        if (!projectPathsList.isEmpty()) {
+            for (String path : projectPathsList) {
+                analyzeSingleProject(path, librariesPath);
+            }
+        }
+    }
+
+    // outputPath specifies the location of the decompiled Android project
+    static void analyzeSingleAPK(String pathToAPK, String pathToJadx, String outputPath, String librariesPath) {
+        Decompiler decompiler = new Decompiler(pathToAPK, null, pathToJadx, outputPath);
+        ArrayList<String> projectPathList = decompiler.startDecompilation();
+
+        if (!projectPathList.isEmpty()) {
+            analyzeSingleProject(projectPathList.get(0), librariesPath);
+        }
+    }
+
+    static void analyzeSingleProject(String projectPath, String librariesPath) {
+        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<>(1);
+        CountDownLatch latch = new CountDownLatch(1);
+        Semaphore concurrentAnalyzers = new Semaphore(1);
+
+        try {
+            ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectPath, libraries, projects, latch, 1, concurrentAnalyzers, librariesPath);
+            projectAnalyzer.run();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println(projects.peek().minimalStringRepresentation());
+    }
+
+    static void analyzeMultipleProjects(String projectsPath, String librariesPath) {
+        File folder = new File(projectsPath);
+        File[] projectFolders = folder.listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File file) {
+                return file.isDirectory();
+            }
+        });
+
+        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<Project>(projectFolders.length);
+        CountDownLatch latch = new CountDownLatch(projectFolders.length);
+
+        Semaphore concurrentAnalyzers;
+        if (multithreaded) {
+            concurrentAnalyzers = new Semaphore(Runtime.getRuntime().availableProcessors());
+        } else {
+            concurrentAnalyzers = new Semaphore(1);
+        }
+
+        //ProjectAnalyzer projectAnalyzer;
+        for (File projectFolder : projectFolders) {
+            try {
+                concurrentAnalyzers.acquire();
+                //Thread thread = new Thread(new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concurrentAnalyzers, librariesPath));
+                //thread.start();
+                ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concurrentAnalyzers, librariesPath);
+                projectAnalyzer.run();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        /*
+        for (Project project : projects) {
+            System.out.println("Project: " + project.minimalStringRepresentation());
+        }*/
+
+        saveResults(projectsPath, projects);
+    }
+
+    static void saveResults(String path, ArrayBlockingQueue<Project> projects) {
+        Map<String, BufferedWriter> writers = new HashMap<String, BufferedWriter>();
+        for (String library : libraries.keySet()) {
+            try {
+                BufferedWriter writer = new BufferedWriter(new FileWriter(path + "/" + library + ".log"));
+                writers.put(library, writer);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        for (Project project : projects) {
+            for (Snippet snippet : project.snippets) {
+                try {
+                    writers.get(snippet.library).write(snippet.toString());
+                    writers.get(snippet.library).newLine();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (NullPointerException e) {
+                    //e.printStackTrace();
+                }
+            }
+        }
+
+        for (BufferedWriter writer : writers.values()) {
+            try {
+                writer.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     static void initLibraries() {
@@ -204,107 +334,5 @@ public class Main {
         androidCore.add("HttpGet");
         androidCore.add("HttpClient");
         libraries.put("android.core", androidCore);
-    }
-
-    // outputPath specifies the location of the decompiled Android project
-    static void analyzeSingleAPK(String pathToAPK, String pathToJadx, String outputPath) {
-        Decompiler decompiler = new Decompiler(pathToAPK, null, pathToJadx, outputPath);
-        decompiler.startDecompilation();
-    }
-
-    static void analyzeSingleProject(String projectPath, String librariesPath) {
-        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<>(1);
-        CountDownLatch latch = new CountDownLatch(1);
-        Semaphore concurrentAnalyzers = new Semaphore(1);
-
-        try {
-            ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectPath, libraries, projects, latch, 1, concurrentAnalyzers, librariesPath);
-            projectAnalyzer.run();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-
-        //System.out.println(projects.peek().minimalStringRepresentation());
-    }
-
-    static void analyzeMultipleProjects(String projectsPath, String librariesPath) {
-        File folder = new File(projectsPath);
-        File[] projectFolders = folder.listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File pathname) {
-                return pathname.isDirectory();
-            }
-        });
-
-        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<Project>(projectFolders.length);
-        CountDownLatch latch = new CountDownLatch(projectFolders.length);
-
-        Semaphore concurrentAnalyzers;
-        if (multithreaded) {
-            concurrentAnalyzers = new Semaphore(Runtime.getRuntime().availableProcessors());
-        } else {
-            concurrentAnalyzers = new Semaphore(1);
-        }
-
-        //ProjectAnalyzer projectAnalyzer;
-        for (File projectFolder : projectFolders) {
-            try {
-                concurrentAnalyzers.acquire();
-                //Thread thread = new Thread(new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concurrentAnalyzers, librariesPath));
-                //thread.start();
-                ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concurrentAnalyzers, librariesPath);
-                projectAnalyzer.run();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
-        }
-
-        try {
-            latch.await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        /*
-        for (Project project : projects) {
-            System.out.println("Project: " + project.minimalStringRepresentation());
-        }*/
-
-        saveResults(projectsPath, projects);
-    }
-
-    static void saveResults(String path, ArrayBlockingQueue<Project> projects) {
-        Map<String, BufferedWriter> writers = new HashMap<String, BufferedWriter>();
-        for (String library : libraries.keySet()) {
-            try {
-                BufferedWriter writer = new BufferedWriter(new FileWriter(path + "/" + library + ".log"));
-                writers.put(library, writer);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        for (Project project : projects) {
-            for (Snippet snippet : project.snippets) {
-                try {
-                    writers.get(snippet.library).write(snippet.toString());
-                    writers.get(snippet.library).newLine();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } catch (NullPointerException e) {
-                    //e.printStackTrace();
-                }
-            }
-        }
-
-        for (BufferedWriter writer : writers.values()) {
-            try {
-                writer.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
     }
 }

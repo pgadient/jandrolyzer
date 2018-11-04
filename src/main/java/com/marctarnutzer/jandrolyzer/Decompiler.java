@@ -7,9 +7,9 @@
 
 package com.marctarnutzer.jandrolyzer;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 
 public class Decompiler {
 
@@ -25,22 +25,44 @@ public class Decompiler {
         this.outputPath = outputPath;
     }
 
-    public void startDecompilation() {
+    public ArrayList<String> startDecompilation() {
+        ArrayList<String> pathsToReturn = new ArrayList<>();
+
         if (pathToAPK != null) {
-            decompile(this.pathToAPK);
+            String path = decompile(this.pathToAPK);
+            if (path != null) {
+                pathsToReturn.add(path);
+            }
         } else if (pathToAPKsFolder != null) {
-            // TODO: iterate through folder and call decompile() on each APK file
+            File apkFolder = new File(pathToAPKsFolder);
+            File[] apkFiles = apkFolder.listFiles(new FileFilter() {
+                @Override
+                public boolean accept(File file) {
+                    return file.getName().endsWith(".apk");
+                }
+            });
+
+            for (File file : apkFiles) {
+                String path = decompile(file.getPath());
+                if (path != null) {
+                    pathsToReturn.add(path);
+                }
+            }
         }
+
+        return pathsToReturn;
     }
 
-    private void decompile(String path) {
+    private String decompile(String path) {
         System.out.println("Starting decompilation process...");
 
         Runtime runtime = Runtime.getRuntime();
 
         try {
-            String jadxCommand = pathToJadx + " -d " + outputPath + " -e " + path;
-            System.out.println("Command: " + jadxCommand);
+            File file = new File(path);
+            String op = Paths.get(outputPath, file.getName()).toString();
+
+            String jadxCommand = pathToJadx + " -d " + op + " -e " + path;
             Process process = runtime.exec(jadxCommand);
 
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -49,20 +71,27 @@ public class Decompiler {
             String outputLine;
 
             while ((outputLine = inputStream.readLine()) != null) {
-                System.out.println(outputLine);
+                System.out.println("IStream: " + outputLine);
             }
 
             inputStream.close();
 
+            boolean encounteredError = false;
             while ((outputLine = errorStream.readLine()) != null) {
-                System.out.println(outputLine);
+                System.out.println("EStream: " + outputLine);
+                encounteredError = true;
             }
 
             errorStream.close();
 
             process.waitFor(); // Wait for jadx decompilation process to terminate
 
-            System.out.println("Decompilation process completed.");
+            if (encounteredError) {
+                System.out.println("Decompilation process completed with errors.");
+            } else {
+                System.out.println("Decompilation process completed.");
+                return op;
+            }
         } catch (IOException e) {
             System.out.println("IOException while decompiling APK");
             e.printStackTrace();
@@ -71,6 +100,7 @@ public class Decompiler {
             e.printStackTrace();
         }
 
+        return null;
     }
 
 }
