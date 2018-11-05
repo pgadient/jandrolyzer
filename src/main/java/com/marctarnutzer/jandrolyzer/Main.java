@@ -86,8 +86,7 @@ public class Main {
         }
 
         String path = stringBuilder.toString().substring(0, stringBuilder.toString().length() - 2);
-
-        /*
+/*
         if (path.startsWith("\"") && path.endsWith("\"")) {
             path = path.substring(1, path.length() - 1);
         }

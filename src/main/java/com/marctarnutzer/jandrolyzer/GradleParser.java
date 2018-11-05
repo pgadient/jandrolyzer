@@ -20,9 +20,9 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class GradleParser extends CodeVisitorSupport {
 
@@ -37,7 +37,7 @@ public class GradleParser extends CodeVisitorSupport {
 
         this.gradleSrc = new String(Files.readAllBytes(Paths.get(this.pathToGradle)));
 
-        removeImports();
+        cleanGradle();
     }
 
     public HashMap<String, String> parse() {
@@ -78,7 +78,6 @@ public class GradleParser extends CodeVisitorSupport {
         }
         */
 
-
         String[] tokens = argumentListExpression.getText().split(":");
 
         if (tokens.length >= 1) {
@@ -111,8 +110,37 @@ public class GradleParser extends CodeVisitorSupport {
         super.visitMethodCallExpression(methodCallExpression);
     }
 
-    private void removeImports() throws IOException {
-        HashSet<String> imports = new HashSet<>();
+    private class Token {
+        public Boolean marked;
+        public String content;
+        public Token parent;
+        public List<Token> children = new LinkedList<>();
+
+        public Token(Boolean marked, String content, Token parent) {
+            this.marked = marked;
+            this.content = content;
+            this.parent = parent;
+        }
+    }
+
+    // Cleans the Gradle file from imports and other unnecessary parts
+    private void cleanGradle() throws IOException {
+        HashSet<String> toRemove = new HashSet<>();
+
+        toRemove.add("ComponentSelection");
+        toRemove.add("MavenDeployment");
+        toRemove.add("InvalidUserDataException");
+        toRemove.add("GradleException");
+        toRemove.add("FileCollection");
+        toRemove.add("StandardOutputListener");
+        toRemove.add("XmlSlurper");
+        toRemove.add("org.gradle.plugins.ide.eclipse.model.SourceFolder");
+        toRemove.add("org.gradle.plugins.ide.eclipse.model.Library");
+        toRemove.add("com.googlecode.htmlcompressor.compressor.HtmlCompressor");
+        toRemove.add("com.google.javascript.jscomp.CompilerOptions");
+        toRemove.add("net.evendanan.versiongenerator.generators.EnvBuildVersionGenerator.CircleCi");
+        toRemove.add("net.evendanan.versiongenerator.generators.GitBuildVersionGenerator");
+        toRemove.add("net.evendanan.versiongenerator.generators.StaticVersionGenerator");
 
         BufferedReader lineReader = new BufferedReader(new StringReader(this.gradleSrc));
         String src = "";
@@ -120,25 +148,60 @@ public class GradleParser extends CodeVisitorSupport {
         while ((line = lineReader.readLine()) != null) {
             if (line.startsWith("import ")) {
                 String[] tokens = line.split("\\.");
-                imports.add(tokens[tokens.length - 1]);
+                toRemove.add(tokens[tokens.length - 1]);
             } else {
                 src = src + line + System.lineSeparator();
             }
         }
 
-        String[] tokens = src.split("((?<=\\{)|(?=\\}))");
+        Pattern pattern = Pattern.compile("\\$\\{([^\\}]+)\\}");
+        Matcher matcher = pattern.matcher(src);
+        StringBuffer stringBuffer = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(stringBuffer, "UNKNOWN_VARIABLE_VALUE");
+        }
+        matcher.appendTail(stringBuffer);
+        src = stringBuffer.toString();
 
+        String[] tokens = src.split("((?=\\{)|(?=\\}))");
+
+        Token sentinel = new Token(false, "", null);
+        Token lastToken = sentinel;
         String cleanSrc = "";
         for (String token : tokens) {
-            String[] t = token.split("[\\s(]");
-            Boolean contains = false;
+            String[] t = token.split("[\\s|(]");
+            Boolean shouldMark = false;
             for (String s : t) {
-                if (imports.contains(s)) {
-                    contains = true;
+                if (toRemove.contains(s)) {
+                    shouldMark = true;
                 }
             }
 
-            if (!contains) {
+            Token tk = null;
+            if (token.startsWith("}")) {
+                tk = new Token(shouldMark, token, lastToken.parent.parent);
+            } else {
+                tk = new Token(shouldMark, token, lastToken);
+            }
+
+            for (Token neighbor : tk.parent.children) {
+                if (neighbor.marked) {
+                    tk.marked = true;
+                }
+            }
+            tk.marked = tk.parent.marked || tk.marked;
+
+            tk.parent.children.add(tk);
+            lastToken = tk;
+
+            if (tk.marked) {
+                if (token.startsWith("{") && !tk.parent.marked) {
+                    cleanSrc = cleanSrc + token.substring(0, 1);
+                } else if (token.startsWith("}") && !tk.parent.marked &&
+                        !tk.parent.children.get(tk.parent.children.size() - 2).marked) {
+                    cleanSrc = cleanSrc + token.substring(0, 1);
+                }
+            } else {
                 cleanSrc = cleanSrc + token;
             }
         }
