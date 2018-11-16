@@ -23,6 +23,7 @@ import com.github.javaparser.symbolsolver.utils.SymbolSolverCollectionStrategy;
 import com.github.javaparser.utils.ParserCollectionStrategy;
 import com.github.javaparser.utils.ProjectRoot;
 import com.github.javaparser.utils.SourceRoot;
+import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.ORGJSONStrategy;
 
 import java.io.*;
 import java.nio.file.Path;
@@ -44,6 +45,7 @@ public class ProjectAnalyzer implements Runnable {
     private boolean shouldPrintAST = false;
     private Semaphore concAnalyzers;
     private String libraryFolderPath;
+    private ORGJSONStrategy orgjsonStrategy = new ORGJSONStrategy();
 
     public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
                            CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
@@ -243,13 +245,26 @@ public class ProjectAnalyzer implements Runnable {
     // Analyze node with symbol solving enabled
     private void analyzeNodeSS(Node node, String path, String name) {
         if (node instanceof  ObjectCreationExpr) {
-            String typeString = null;
-            switch(((ObjectCreationExpr) node).getType().getName().asString()) {
-                case "JsonObjectRequest": case "JsonArrayRequest": case "StringRequest": case "ImageRequest": // com.android.volley, com.mcxiaoke.volley
-                    //typeString = estimateType((Expression) node);
-                    if (((ObjectCreationExpr) node).getArguments().size() > 2) {
-                        LinkedList<String> argTypes = new LinkedList<>();
-                        for (Expression expression : ((ObjectCreationExpr) node).getArguments()) {
+            analyzeObjectCreationExpr(node, path, name);
+        } else if (node instanceof MethodCallExpr) {
+            analyzeMethodCallExpr(node, path, name);
+        } else if (node instanceof CastExpr) {
+            analyzeCastExpr(node, path, name);
+        }
+
+        for (Node child : node.getChildNodes()) {
+            analyzeNodeSS(child, path, name);
+        }
+    }
+
+    private void analyzeObjectCreationExpr(Node node, String path, String name) {
+        String typeString = null;
+        switch(((ObjectCreationExpr) node).getType().getName().asString()) {
+            case "JsonObjectRequest": case "JsonArrayRequest": case "StringRequest": case "ImageRequest": // com.android.volley, com.mcxiaoke.volley
+                //typeString = estimateType((Expression) node);
+                if (((ObjectCreationExpr) node).getArguments().size() > 2) {
+                    LinkedList<String> argTypes = new LinkedList<>();
+                    for (Expression expression : ((ObjectCreationExpr) node).getArguments()) {
                             /*
                             String expressionType = estimateType(expression);
                             if (expressionType != null) {
@@ -259,137 +274,138 @@ public class ProjectAnalyzer implements Runnable {
                                 // Instead of Response.Listener and response error, lambda expressions can be used...
                             }
                             */
-                            if (expression instanceof ObjectCreationExpr) {
-                                if (((ObjectCreationExpr) expression).getType().asString().contains("Response.Listener")) {
-                                    System.out.println("Type arguments: " +
-                                            ((ObjectCreationExpr) expression).getType().getTypeArguments().get());
-                                    // TODO: Type arguments can be used later for JSON structure etc.
-                                    argTypes.add("Response.Listener");
-                                }
-                            }
-                        }
-                        if (argTypes.contains("Response.Listener")) {
-                            saveSnippet(path, name, "com.android.volley",
-                                    ((ObjectCreationExpr) node).getType().getName().asString(), node);
-                            System.out.println("Snippet saved!");
-                        }
-                    }
-                    break;
-                case "Builder":
-                    typeString = estimateType((Expression) node);
-                    if (typeString != null) {
-                        if (typeString.equals("okhttp3.Request.Builder")) {
-                            saveSnippet(path, name, "com.squareup.okhttp3", typeString, node);
-                        } else if (typeString.equals("com.squareup.okhttp.Request.Builder")) {
-                            saveSnippet(path, name, "com.squareup.okhttp", typeString, node);
-                        } else if (typeString.equals("retrofit.Retrofit.Builder")
-                                || typeString.equals("retrofit2.Retrofit.Builder")
-                                || typeString.equals("retrofit.RestAdapter.Builder")
-                                || typeString.equals("retrofit2.RestAdapter.Builder")) {
-                            saveSnippet(path, name, "com.squareup.retrofit", typeString, node);
-                        }
-                    }
-                    break;
-                case "Socket": // Library: java.net.Socket
-                    typeString = estimateType((Expression) node);
-                    if (typeString.equals("java.net.Socket")) {
-                        saveSnippet(path, name, typeString, typeString, node);
-                    }
-                    break;
-                case "SSLSocket": // Library: javax.net.ssl.SSLSocket
-                    typeString = estimateType((Expression) node);
-                    if (typeString.equals("javax.net.ssl.SSLSocket")) {
-                        saveSnippet(path, name, typeString, typeString, node);
-                    }
-                    break;
-                default:
-                    //System.out.println("Not identified: " + node.toString());
-                    //System.out.println("    type: " + ((ObjectCreationExpr) node).getType().getName().asString());
-            }
-
-        } else if (node instanceof MethodCallExpr) {
-            String typeString = null;
-            switch(((MethodCallExpr) node).getName().asString()) {
-                case "openConnection": case "openStream": // Libraries: java.net.HttpURLConnection, java.net.URLConnection
-                    typeString = estimateType((Expression) node);
-                    if (typeString != null) {
-                        if (typeString.equals("java.net.URLConnection")) {
-                            saveSnippet(path, name, "java.net.URLConnection", typeString, node);
-                        } else if (typeString.equals("java.net.HttpURLConnection")) {
-                            saveSnippet(path, name, "java.net.HttpURLConnection", typeString, node);
-                        }
-                    }
-                    break;
-                case "execute": // Libraries: org.apache.httpcomponents, android.net.http
-                    if (((MethodCallExpr) node).getScope().isPresent()) {
-                        String scopeType = estimateType(((MethodCallExpr) node).getScope().get());
-                        if (scopeType != null) {
-                            if (scopeType.equals("org.apache.http.client.HttpClient")
-                                    || scopeType.equals("org.apache.http.impl.client.CloseableHttpClient ")
-                                    || scopeType.equals("org.apache.http.impl.client.DefaultHttpClient")) {
-                                saveSnippet(path, name, "org.apache.httpcomponents", scopeType, node);
-                            } else if (scopeType.equals("android.net.http.AndroidHttpClient")) {
-                                saveSnippet(path, name, "android.core", scopeType, node);
+                        if (expression instanceof ObjectCreationExpr) {
+                            if (((ObjectCreationExpr) expression).getType().asString().contains("Response.Listener")) {
+                                System.out.println("Type arguments: " +
+                                        ((ObjectCreationExpr) expression).getType().getTypeArguments().get());
+                                // TODO: Type arguments can be used later for JSON structure etc.
+                                argTypes.add("Response.Listener");
                             }
                         }
                     }
-                    break;
-                case "get": case "post": // Libraries: com.loopj.android
-                    //typeString = estimateType((Expression) node); // TODO: This does not work for com.loopj.android, even though the parameters are resolved successfully
-                    if (((MethodCallExpr) node).getArguments().size() >= 2) {
-                        LinkedList<String> argTypes = new LinkedList<>();
-                        for (Expression expression : ((MethodCallExpr) node).getArguments()) {
-                            String expressionType = estimateType(expression);
-                            if (expressionType != null) {
-                                argTypes.add(expressionType);
-                            }
-                        }
-                        if (argTypes.contains("com.loopj.android.http.AsyncHttpResponseHandler")) {
-                            saveSnippet(path, name, "com.loopj.android", "com.loopj.android.http.AsyncHttpClient", node);
-                        }
+                    if (argTypes.contains("Response.Listener")) {
+                        saveSnippet(path, name, "com.android.volley",
+                                ((ObjectCreationExpr) node).getType().getName().asString(), node);
+                        System.out.println("Snippet saved!");
                     }
-                    break;
-                case "with": // com.github.bumptech.glide
-                    typeString = estimateType((Expression) node);
-                    if (typeString != null && typeString.equals("com.koushikdutta.ion.builder.LoadBuilder")) {
-                        saveSnippet(path, name, "com.koushikdutta.ion", typeString, node);
-                    } else if (((MethodCallExpr) node).getScope().isPresent()) {
-                        String scopeType = estimateType(((MethodCallExpr) node).getScope().get());
-                        if (scopeType != null) {
-                            if (scopeType.equals("com.bumptech.glide.Glide")) {
-                                saveSnippet(path, name, "com.github.bumptech.glide", scopeType, node);
-                            } else if (scopeType.equals("com.koushikdutta.ion.Ion")) {
-                                saveSnippet(path, name, "com.koushikdutta.ion", scopeType, node);
-                            } else {
-                                //System.out.println("Different scope type: " + scopeType);
-                            }
-                        }
+                }
+                break;
+            case "Builder":
+                typeString = estimateType((Expression) node);
+                if (typeString != null) {
+                    if (typeString.equals("okhttp3.Request.Builder")) {
+                        saveSnippet(path, name, "com.squareup.okhttp3", typeString, node);
+                    } else if (typeString.equals("com.squareup.okhttp.Request.Builder")) {
+                        saveSnippet(path, name, "com.squareup.okhttp", typeString, node);
+                    } else if (typeString.equals("retrofit.Retrofit.Builder")
+                            || typeString.equals("retrofit2.Retrofit.Builder")
+                            || typeString.equals("retrofit.RestAdapter.Builder")
+                            || typeString.equals("retrofit2.RestAdapter.Builder")) {
+                        saveSnippet(path, name, "com.squareup.retrofit", typeString, node);
                     }
-                    break;
-                case "getJSONObject": case "getFile": case "getJSONArray": case "getString": // com.koushikdutta.async
-                    // Too few examples to test (only 3 of the F Droid projects use async but in combination with ION)
-                    break;
-            }
-        } else if (node instanceof CastExpr) {
-            switch(((CastExpr) node).getType().asString()) {
-                case "HttpsURLConnection": case "HttpURLConnection": // Libraries: java.net.HttpURLConnection, javax.net.ssl.HttpsURLConnection
-                    if (((CastExpr) node).getExpression() instanceof MethodCallExpr) {
-                        switch (((MethodCallExpr) ((CastExpr) node).getExpression()).getName().asString()) {
-                            case "openConnection": case "openStream":
-                                String methodCallType = estimateType(((CastExpr) node).getExpression());
-                                String castType = estimateType((Expression) node);
-                                if (methodCallType != null) {
-                                    if (methodCallType.equals("java.net.URLConnection")) {
-                                        saveSnippet(path, name, castType, castType, node);
-                                    }
-                                }
-                        }
-                    }
-            }
+                }
+                break;
+            case "Socket": // Library: java.net.Socket
+                typeString = estimateType((Expression) node);
+                if (typeString.equals("java.net.Socket")) {
+                    saveSnippet(path, name, typeString, typeString, node);
+                }
+                break;
+            case "SSLSocket": // Library: javax.net.ssl.SSLSocket
+                typeString = estimateType((Expression) node);
+                if (typeString.equals("javax.net.ssl.SSLSocket")) {
+                    saveSnippet(path, name, typeString, typeString, node);
+                }
+                break;
+            default:
+                //System.out.println("Not identified: " + node.toString());
+                //System.out.println("    type: " + ((ObjectCreationExpr) node).getType().getName().asString());
         }
+    }
 
-        for (Node child : node.getChildNodes()) {
-            analyzeNodeSS(child, path, name);
+    private void analyzeMethodCallExpr(Node node, String path, String name) {
+        String typeString = null;
+        switch(((MethodCallExpr) node).getName().asString()) {
+            case "openConnection": case "openStream": // Libraries: java.net.HttpURLConnection, java.net.URLConnection
+                typeString = estimateType((Expression) node);
+                if (typeString != null) {
+                    if (typeString.equals("java.net.URLConnection")) {
+                        saveSnippet(path, name, "java.net.URLConnection", typeString, node);
+                    } else if (typeString.equals("java.net.HttpURLConnection")) {
+                        saveSnippet(path, name, "java.net.HttpURLConnection", typeString, node);
+                    }
+                }
+                break;
+            case "execute": // Libraries: org.apache.httpcomponents, android.net.http
+                if (((MethodCallExpr) node).getScope().isPresent()) {
+                    String scopeType = estimateType(((MethodCallExpr) node).getScope().get());
+                    if (scopeType != null) {
+                        if (scopeType.equals("org.apache.http.client.HttpClient")
+                                || scopeType.equals("org.apache.http.impl.client.CloseableHttpClient ")
+                                || scopeType.equals("org.apache.http.impl.client.DefaultHttpClient")) {
+                            saveSnippet(path, name, "org.apache.httpcomponents", scopeType, node);
+                        } else if (scopeType.equals("android.net.http.AndroidHttpClient")) {
+                            saveSnippet(path, name, "android.core", scopeType, node);
+                        }
+                    }
+                }
+                break;
+            case "get": case "post": // Libraries: com.loopj.android
+                //typeString = estimateType((Expression) node); // TODO: This does not work for com.loopj.android, even though the parameters are resolved successfully
+                if (((MethodCallExpr) node).getArguments().size() >= 2) {
+                    LinkedList<String> argTypes = new LinkedList<>();
+                    for (Expression expression : ((MethodCallExpr) node).getArguments()) {
+                        String expressionType = estimateType(expression);
+                        if (expressionType != null) {
+                            argTypes.add(expressionType);
+                        }
+                    }
+                    if (argTypes.contains("com.loopj.android.http.AsyncHttpResponseHandler")) {
+                        saveSnippet(path, name, "com.loopj.android", "com.loopj.android.http.AsyncHttpClient", node);
+                    }
+                }
+                break;
+            case "with": // com.github.bumptech.glide
+                typeString = estimateType((Expression) node);
+                if (typeString != null && typeString.equals("com.koushikdutta.ion.builder.LoadBuilder")) {
+                    saveSnippet(path, name, "com.koushikdutta.ion", typeString, node);
+                } else if (((MethodCallExpr) node).getScope().isPresent()) {
+                    String scopeType = estimateType(((MethodCallExpr) node).getScope().get());
+                    if (scopeType != null) {
+                        if (scopeType.equals("com.bumptech.glide.Glide")) {
+                            saveSnippet(path, name, "com.github.bumptech.glide", scopeType, node);
+                        } else if (scopeType.equals("com.koushikdutta.ion.Ion")) {
+                            saveSnippet(path, name, "com.koushikdutta.ion", scopeType, node);
+                        } else {
+                            //System.out.println("Different scope type: " + scopeType);
+                        }
+                    }
+                }
+                break;
+            case "getJSONObject": case "getFile": case "getJSONArray": case "getString": // com.koushikdutta.async
+                // Too few examples to test (only 3 of the F Droid projects use async but in combination with ION)
+                break;
+            case "put":
+                orgjsonStrategy.extract(node);
+                break;
+        }
+    }
+
+    private void analyzeCastExpr(Node node, String path, String name) {
+        switch(((CastExpr) node).getType().asString()) {
+            case "HttpsURLConnection": case "HttpURLConnection": // Libraries: java.net.HttpURLConnection, javax.net.ssl.HttpsURLConnection
+                if (((CastExpr) node).getExpression() instanceof MethodCallExpr) {
+                    switch (((MethodCallExpr) ((CastExpr) node).getExpression()).getName().asString()) {
+                        case "openConnection": case "openStream":
+                            String methodCallType = estimateType(((CastExpr) node).getExpression());
+                            String castType = estimateType((Expression) node);
+                            if (methodCallType != null) {
+                                if (methodCallType.equals("java.net.URLConnection")) {
+                                    saveSnippet(path, name, castType, castType, node);
+                                }
+                            }
+                    }
+                }
         }
     }
 
