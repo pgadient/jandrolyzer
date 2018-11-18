@@ -10,9 +10,9 @@ package com.marctarnutzer.jandrolyzer;
 public enum JSONDataType {
     STRING,
     NUMBER_INT,
-    NUMBER_FLOAT,
-    OBJECT, // JSON object
-    ARRAY, // JSON array of JSON objects
+    NUMBER_DOUBLE,
+    OBJECT, // JSONObject object
+    ARRAY, // JSONObject array of JSONObject objects
     BOOLEAN,
     NULL
 }

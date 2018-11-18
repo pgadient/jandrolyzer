@@ -42,10 +42,11 @@ public class ProjectAnalyzer implements Runnable {
     private CountDownLatch latch;
     private int totalProjects;
     private boolean enableSymbolSolving = true;
-    private boolean shouldPrintAST = false;
+    private boolean shouldPrintAST = true;
     private Semaphore concAnalyzers;
     private String libraryFolderPath;
     private ORGJSONStrategy orgjsonStrategy = new ORGJSONStrategy();
+    private Map<String, JSONRoot> jsonModels = new HashMap<>();
 
     public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
                            CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
@@ -117,7 +118,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("BaseSuggestionsModel.java")) {
+                        if (name.equals("Reddinator.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -278,7 +279,7 @@ public class ProjectAnalyzer implements Runnable {
                             if (((ObjectCreationExpr) expression).getType().asString().contains("Response.Listener")) {
                                 System.out.println("Type arguments: " +
                                         ((ObjectCreationExpr) expression).getType().getTypeArguments().get());
-                                // TODO: Type arguments can be used later for JSON structure etc.
+                                // TODO: Type arguments can be used later for JSONObject structure etc.
                                 argTypes.add("Response.Listener");
                             }
                         }
@@ -386,7 +387,7 @@ public class ProjectAnalyzer implements Runnable {
                 // Too few examples to test (only 3 of the F Droid projects use async but in combination with ION)
                 break;
             case "put":
-                orgjsonStrategy.extract(node);
+                orgjsonStrategy.extract(node, path, jsonModels);
                 break;
         }
     }
@@ -503,6 +504,12 @@ public class ProjectAnalyzer implements Runnable {
     @Override
     public void run() {
         analyze();
+
+        System.out.println(jsonModels.size() + " detected JSON models:");
+        for (Map.Entry<String, JSONRoot> jsonRootEntry : this.jsonModels.entrySet()) {
+            System.out.println("ID: " + jsonRootEntry.getKey() + "\n" + jsonRootEntry.getValue().toString());
+        }
+
         JavaParserFacade.clearInstances();
         System.out.println("Processed: " + projects.size() + " of " + totalProjects);
         latch.countDown();

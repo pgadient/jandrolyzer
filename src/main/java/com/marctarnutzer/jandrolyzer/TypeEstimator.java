@@ -16,37 +16,20 @@ public class TypeEstimator {
     public static String estimateTypeName(Expression expr) {
         String typeString = null;
 
-        //System.out.println("Code: " + expr.toString());
-
         try {
-            if (expr instanceof MethodCallExpr) {
-                ResolvedType resolvedType = expr.calculateResolvedType();
-                typeString = resolvedType.asReferenceType().getQualifiedName();
+            ResolvedType resolvedType = expr.calculateResolvedType();
 
-                //System.out.println("[RESOLVED] MethodCallExpr was resolved to: " + typeString);
-            } else if (expr instanceof ObjectCreationExpr) {
-                ResolvedType resolvedType = expr.calculateResolvedType();
-                typeString = resolvedType.asReferenceType().getQualifiedName();
-
-                //System.out.println("[RESOLVED] ObjectCreationExpr was resolved to: " + typeString);
-            } else if (expr instanceof CastExpr) {
-                typeString = expr.calculateResolvedType().asReferenceType().getQualifiedName();
-
-                //System.out.println("[RESOLVED] CastExpr was resolved to: " + typeString);
-            } else if (expr instanceof NameExpr) {
-                ResolvedType resolvedType = expr.calculateResolvedType();
-                typeString = resolvedType.asReferenceType().getQualifiedName();
-
-                //System.out.println("[RESOLVED] NameExpr was resolved to : " + typeString);
+            if (resolvedType.isPrimitive()) {
+                typeString = resolvedType.asPrimitive().getBoxTypeQName();
             } else {
-                //System.out.println("Expression is a: " + expr.getClass());
+                typeString = resolvedType.asReferenceType().getQualifiedName();
             }
         } catch (UnsolvedSymbolException e) {
             typeString = e.getName();
             System.out.println("[NOT RESOLVED] was no resolved but estimated to type: " + typeString + " Exception: " + e);
         }  catch (Exception e) {
             typeString = null;
-            //System.out.println("[NOT RESOLVED] Exception: " + e);
+            System.out.println("[NOT RESOLVED] Exception: " + e);
         }
 
         return typeString;
