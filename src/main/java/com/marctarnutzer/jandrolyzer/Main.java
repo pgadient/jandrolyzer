@@ -333,5 +333,8 @@ public class Main {
         androidCore.add("HttpGet");
         androidCore.add("HttpClient");
         libraries.put("android.core", androidCore);
+
+        HashSet<String> gson = new HashSet<String>();
+        libraries.put("com.google.code.gson", gson);
     }
 }

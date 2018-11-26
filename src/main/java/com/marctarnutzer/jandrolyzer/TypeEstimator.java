@@ -29,6 +29,11 @@ public class TypeEstimator {
             System.out.println("[NOT RESOLVED] was no resolved but estimated to type: " + typeString + " Exception: " + e);
         }  catch (Exception e) {
             typeString = null;
+
+            if (expr instanceof ObjectCreationExpr) {
+                typeString = ((ObjectCreationExpr) expr).getType().asString();
+            }
+
             System.out.println("[NOT RESOLVED] Exception: " + e);
         }
 

@@ -23,6 +23,7 @@ import com.github.javaparser.symbolsolver.utils.SymbolSolverCollectionStrategy;
 import com.github.javaparser.utils.ParserCollectionStrategy;
 import com.github.javaparser.utils.ProjectRoot;
 import com.github.javaparser.utils.SourceRoot;
+import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.GSONStrategy;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.ORGJSONStrategy;
 
 import java.io.*;
@@ -47,6 +48,7 @@ public class ProjectAnalyzer implements Runnable {
     private String libraryFolderPath;
     private ORGJSONStrategy orgjsonStrategy = new ORGJSONStrategy();
     private Map<String, JSONRoot> jsonModels = new HashMap<>();
+    private GSONStrategy gsonStrategy = new GSONStrategy();
 
     public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
                            CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
@@ -388,6 +390,9 @@ public class ProjectAnalyzer implements Runnable {
                 break;
             case "put":
                 orgjsonStrategy.extract(node, path, jsonModels);
+                break;
+            case "addProperty": case "toJson":
+                gsonStrategy.extract(node, path, jsonModels);
                 break;
         }
     }

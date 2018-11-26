@@ -22,6 +22,7 @@ public class JSONRoot {
         this.scopeName = scopeName;
     }
 
+    //TODO: Maybe change to path & className & [the whole class, constructor, method, etc. chain separated by &]
     public String getIdentifier() {
         return path + "&" + className + "&" + methodName + "&" + scopeName;
     }
