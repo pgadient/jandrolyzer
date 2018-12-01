@@ -38,4 +38,8 @@ public class JSONRoot {
         return stringBuilder.toString();
     }
 
+    public String formatJSON() {
+        return this.jsonObject.formatJSON();
+    }
+
 }

@@ -11,15 +11,16 @@ import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
-import com.github.javaparser.ast.expr.AnnotationExpr;
-import com.github.javaparser.ast.expr.Expression;
-import com.github.javaparser.ast.expr.MethodCallExpr;
-import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.type.Type;
+import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
+import com.github.javaparser.resolution.types.ResolvedType;
+import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.marctarnutzer.jandrolyzer.JSONDataType;
 import com.marctarnutzer.jandrolyzer.JSONObject;
 import com.marctarnutzer.jandrolyzer.JSONRoot;
@@ -30,7 +31,11 @@ import java.util.Set;
 
 public class GSONStrategy {
 
-    public void extract(Node node, String path, Map<String, JSONRoot> jsonModels) {
+    CombinedTypeSolver combinedTypeSolver;
+
+    public void extract(Node node, String path, Map<String, JSONRoot> jsonModels, CombinedTypeSolver combinedTypeSolver) {
+        this.combinedTypeSolver = combinedTypeSolver;
+
         if (node instanceof MethodCallExpr) {
             if (((MethodCallExpr) node).getName().asString().equals("addProperty")) {
                 jsonObjectExtraction(node, path, jsonModels);
@@ -100,9 +105,8 @@ public class GSONStrategy {
                                             analyzeFields(declaratorType.asClassOrInterfaceType().resolve()
                                                     .getDeclaredFields(), modelPath,
                                                     declaratorType.asClassOrInterfaceType().getName().asString(),
-                                                    jsonModels);
+                                                    jsonModels, null, null);
                                         }
-
                                     } else {
                                         System.out.println("Node is not a VariableDeclarator nor FieldDeclaration" +
                                                 declarationNode.getClass());
@@ -125,14 +129,17 @@ public class GSONStrategy {
     }
 
     private void analyzeFields(Set<ResolvedFieldDeclaration> resolvedFieldDeclarations, String modelPath,
-                               String className, Map<String, JSONRoot> jsonModels) {
+                               String className, Map<String, JSONRoot> jsonModels, JSONRoot jsonRoot,
+                               JSONObject jsonObject) {
         System.out.println("Analyzing fields in: " + modelPath);
 
-        JSONRoot jsonRoot = new JSONRoot(modelPath, className, null, null);
+        if (jsonObject == null && jsonRoot == null) {
+            jsonRoot = new JSONRoot(modelPath, className, null, null);
+        }
 
         for (ResolvedFieldDeclaration resolvedFieldDeclaration : resolvedFieldDeclarations) {
             System.out.println("Field: " + resolvedFieldDeclaration);
-            System.out.println("Type: " + resolvedFieldDeclaration.getType());
+            //System.out.println("Type: " + resolvedFieldDeclaration.getType());
 
             FieldDeclaration fieldDeclaration = ((JavaParserFieldDeclaration)resolvedFieldDeclaration).getWrappedNode();
 
@@ -148,29 +155,93 @@ public class GSONStrategy {
                 }
             }
 
-            if (jsonRoot.jsonObject == null) {
+            if (jsonRoot != null && jsonRoot.jsonObject == null) {
                 jsonRoot.jsonObject = new JSONObject(JSONDataType.OBJECT, null, null);
             }
 
             String keyString = resolvedFieldDeclaration.getName();
 
-            String valueType = null;
+            JSONObject toInsert = null;
 
-            if (resolvedFieldDeclaration.getType().isPrimitive()) {
-                valueType = resolvedFieldDeclaration.getType().asPrimitive().getBoxTypeQName();
-            } else if (resolvedFieldDeclaration.getType().isReferenceType()) {
-                valueType = resolvedFieldDeclaration.getType().asReferenceType().getQualifiedName();
+            String fieldDeclarationTypeString = null;
+            try {
+                ResolvedType fieldDeclarationType = resolvedFieldDeclaration.getType();
+            } catch (UnsolvedSymbolException e) {
+                System.out.println("Unsolved exception: " + e);
+                fieldDeclarationTypeString = e.getName();
             }
 
-            if (valueType == null) {
+            if (fieldDeclarationTypeString != null) {
+                if (fieldDeclarationTypeString.equals("String")) {
+                    toInsert = new JSONObject(null, null, "java.lang.String");
+                } else {
+                    continue;
+                }
+            } else if (resolvedFieldDeclaration.getType().isPrimitive()) {
+                String valueType = resolvedFieldDeclaration.getType().asPrimitive().getBoxTypeQName();
+
+                if (valueType == null) {
+                    continue;
+                }
+
+                toInsert = new JSONObject(null, null, valueType);
+            } else if (resolvedFieldDeclaration.getType().isReferenceType()) {
+                String resolvedReferenceTypeString = resolvedFieldDeclaration.getType().asReferenceType().
+                        getQualifiedName();
+                System.out.println("!TypeString" + resolvedReferenceTypeString);
+                if (resolvedReferenceTypeString.equals("java.lang.String")
+                        || resolvedReferenceTypeString.equals("java.lang.Double")
+                        || resolvedReferenceTypeString.equals("java.lang.Long")
+                        || resolvedReferenceTypeString.equals("java.lang.Integer")
+                        || resolvedReferenceTypeString.equals("java.lang.Boolean")) {
+                    toInsert = new JSONObject(null, null, resolvedReferenceTypeString);
+                } else {
+                    try {
+                        //Node fieldDeclarationNode = ((JavaParserFieldDeclaration) resolvedFieldDeclaration).getWrappedNode();
+                        //Type resolvedType = ((FieldDeclaration) fieldDeclarationNode).getElementType();
+                        //ResolvedFieldDeclaration rfd = ((FieldDeclaration)fieldDeclarationNode).resolve();
+                        //Type resolvedType = (Type)rfd;
+
+                        //Type resolvedType = (Type)(((FieldDeclaration) fieldDeclarationNode).resolve().getType());
+
+                         /*
+                        Node declarationNode = ((JavaParserFieldDeclaration) resolvedFieldDeclaration).getWrappedNode();
+                        System.out.println("Declaring field dec type: " + declarationNode + " Class: " + declarationNode.getClass());
+                        resolvedType = resolvedType.getElementType();
+                        */
+
+                        Type resolvedType = fieldDeclaration.getElementType();
+                        System.out.println("Field declaration: " + fieldDeclaration + ", type: " + resolvedType);
+
+                        ResolvedType type = JavaParserFacade.get(combinedTypeSolver).convertToUsage(resolvedType);
+                        System.out.println("sdsd: " + type.asReferenceType().getDeclaredFields());
+
+                        toInsert = new JSONObject(JSONDataType.OBJECT, null, null);
+                        analyzeFields(type.asReferenceType().getDeclaredFields(), modelPath, className, jsonModels
+                                , null, toInsert);
+
+                    } catch (Exception e) {
+                        System.out.println("Exception2: " + e);
+                    }
+                }
+            }
+
+            if (toInsert == null) {
                 continue;
             }
+            System.out.println("toInsert passed");
 
-            JSONObject toInsert = new JSONObject(null, null, valueType);
-            jsonRoot.jsonObject.linkedHashMap.put(keyString, toInsert);
+            if (jsonRoot != null) {
+                System.out.println("Putting in jsonRoot... " + keyString);
+                jsonRoot.jsonObject.linkedHashMap.put(keyString, toInsert);
+            } else {
+                System.out.println("Putting in jsonobject... " + keyString);
+                jsonObject.linkedHashMap.put(keyString, toInsert);
+                System.out.println("Putting in jsonobject complete.");
+            }
         }
 
-        if (jsonRoot.jsonObject != null && !jsonRoot.jsonObject.linkedHashMap.isEmpty()) {
+        if (jsonRoot != null && jsonRoot.jsonObject != null && !jsonRoot.jsonObject.linkedHashMap.isEmpty()) {
             jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
         }
 

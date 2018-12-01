@@ -392,7 +392,7 @@ public class ProjectAnalyzer implements Runnable {
                 orgjsonStrategy.extract(node, path, jsonModels);
                 break;
             case "addProperty": case "toJson":
-                gsonStrategy.extract(node, path, jsonModels);
+                gsonStrategy.extract(node, path, jsonModels, combinedTypeSolver);
                 break;
         }
     }
@@ -512,7 +512,8 @@ public class ProjectAnalyzer implements Runnable {
 
         System.out.println(jsonModels.size() + " detected JSON models:");
         for (Map.Entry<String, JSONRoot> jsonRootEntry : this.jsonModels.entrySet()) {
-            System.out.println("ID: " + jsonRootEntry.getKey() + "\n" + jsonRootEntry.getValue().toString());
+            //System.out.println("ID: " + jsonRootEntry.getKey() + "\n" + jsonRootEntry.getValue().toString());
+            System.out.println("ID: " + jsonRootEntry.getKey() + "\n" + jsonRootEntry.getValue().formatJSON());
         }
 
         JavaParserFacade.clearInstances();

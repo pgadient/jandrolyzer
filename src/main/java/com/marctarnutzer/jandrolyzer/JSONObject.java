@@ -7,7 +7,6 @@
 
 package com.marctarnutzer.jandrolyzer;
 
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -31,7 +30,7 @@ public class JSONObject {
                 case "java.lang.String":
                     this.jsonDataType = JSONDataType.STRING;
                     break;
-                case "java.lang.Double":
+                case "java.lang.Double": case "java.lang.Long":
                     this.jsonDataType = JSONDataType.NUMBER_DOUBLE;
                     break;
                 case "java.lang.Integer":
@@ -68,6 +67,30 @@ public class JSONObject {
             }
         }
         stringBuilder.append("=========================JSONObject=========================\n");
+        return stringBuilder.toString();
+    }
+
+    public String formatJSON() {
+        StringBuilder stringBuilder = new StringBuilder();
+        if (this.jsonDataType == JSONDataType.OBJECT) {
+            stringBuilder.append("{");
+            for (Map.Entry<String, JSONObject> jsonObjectEntry : this.linkedHashMap.entrySet()) {
+                stringBuilder.append("\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue().formatJSON() + ",");
+            }
+
+            stringBuilder.deleteCharAt(stringBuilder.length() - 1);
+
+            stringBuilder.append("}");
+        } else if (this.jsonDataType == JSONDataType.ARRAY) {
+            // TODO
+        } else {
+            if (value != null) {
+                stringBuilder.append("\"" + value.toString() + "\"");
+            } else {
+                stringBuilder.append("\"<" + this.jsonDataType + ">\"");
+            }
+        }
+
         return stringBuilder.toString();
     }
 
