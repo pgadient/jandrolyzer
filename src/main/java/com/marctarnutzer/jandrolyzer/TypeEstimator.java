@@ -11,6 +11,9 @@ import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.types.ResolvedType;
 
+import java.util.Arrays;
+import java.util.HashSet;
+
 public class TypeEstimator {
 
     public static String estimateTypeName(Expression expr) {
@@ -39,5 +42,15 @@ public class TypeEstimator {
 
         return typeString;
     }
+
+    public static boolean extendsCollection(String typeString) {
+        return collectionHashSet.contains(typeString);
+    }
+
+    // TODO: extend this set with all interfaces and classes which extend Collection
+    static HashSet<String> collectionHashSet = new HashSet<>(Arrays.asList(
+            "java.util.List",
+            "java.util.ArrayList",
+            "java.util.Set"));
 
 }

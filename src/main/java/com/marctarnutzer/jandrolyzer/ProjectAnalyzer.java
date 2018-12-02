@@ -19,6 +19,8 @@ import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 import com.github.javaparser.symbolsolver.utils.SymbolSolverCollectionStrategy;
 import com.github.javaparser.utils.ParserCollectionStrategy;
 import com.github.javaparser.utils.ProjectRoot;
@@ -70,6 +72,8 @@ public class ProjectAnalyzer implements Runnable {
         ProjectRoot projectRoot;
         if (enableSymbolSolving) {
             this.combinedTypeSolver = new CombinedTypeSolver();
+            //this.combinedTypeSolver.add(new JavaParserTypeSolver(projectFolder.toPath()));
+            this.combinedTypeSolver.add(new ReflectionTypeSolver(false));
 
             LinkedList<String> gradleFilePaths = new LinkedList<>();
             getGradleFilePaths(gradleFilePaths, this.project.path);
@@ -120,7 +124,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("Reddinator.java")) {
+                        if (name.equals("WeatherInfo.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {

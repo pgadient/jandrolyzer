@@ -197,29 +197,33 @@ public class GSONStrategy {
                     toInsert = new JSONObject(null, null, resolvedReferenceTypeString);
                 } else {
                     try {
-                        //Node fieldDeclarationNode = ((JavaParserFieldDeclaration) resolvedFieldDeclaration).getWrappedNode();
-                        //Type resolvedType = ((FieldDeclaration) fieldDeclarationNode).getElementType();
-                        //ResolvedFieldDeclaration rfd = ((FieldDeclaration)fieldDeclarationNode).resolve();
-                        //Type resolvedType = (Type)rfd;
+                        Type fieldType = fieldDeclaration.getElementType();
+                        System.out.println("Field declaration: " + fieldDeclaration + ", type: " + fieldType);
 
-                        //Type resolvedType = (Type)(((FieldDeclaration) fieldDeclarationNode).resolve().getType());
+                        // TODO: Ask maintainers why this approach is necessary and why fieldType.resolve() doesn't work
+                        ResolvedType resolvedType = JavaParserFacade.get(combinedTypeSolver).convertToUsage(fieldType);
+                        System.out.println("Field type: " + resolvedType.asReferenceType());
+                        System.out.println("Type fields: " + resolvedType.asReferenceType().getDeclaredFields());
 
-                         /*
-                        Node declarationNode = ((JavaParserFieldDeclaration) resolvedFieldDeclaration).getWrappedNode();
-                        System.out.println("Declaring field dec type: " + declarationNode + " Class: " + declarationNode.getClass());
-                        resolvedType = resolvedType.getElementType();
-                        */
+                        System.out.println("Collection: " + (fieldType.asClassOrInterfaceType().getTypeArguments()));
 
-                        Type resolvedType = fieldDeclaration.getElementType();
-                        System.out.println("Field declaration: " + fieldDeclaration + ", type: " + resolvedType);
+                        if (TypeEstimator.extendsCollection(resolvedReferenceTypeString)) {
+                            System.out.println("Its a collection type");
+                            if (fieldType.asClassOrInterfaceType().getTypeArguments().isPresent() &&
+                                    fieldType.asClassOrInterfaceType().getTypeArguments().get().size() == 1) {
+                                System.out.println("Inserting JSON Array...");
+                                toInsert = new JSONObject(JSONDataType.ARRAY, null, null);
 
-                        ResolvedType type = JavaParserFacade.get(combinedTypeSolver).convertToUsage(resolvedType);
-                        System.out.println("sdsd: " + type.asReferenceType().getDeclaredFields());
+                                Type typeArgumentType = fieldType.asClassOrInterfaceType().getTypeArguments().get().get(0);
+                                ResolvedType resolvedTypeArgType = JavaParserFacade.get(combinedTypeSolver).convertToUsage(typeArgumentType);
 
-                        toInsert = new JSONObject(JSONDataType.OBJECT, null, null);
-                        analyzeFields(type.asReferenceType().getDeclaredFields(), modelPath, className, jsonModels
-                                , null, toInsert);
-
+                                analyzeFields(resolvedTypeArgType.asReferenceType().getDeclaredFields(), modelPath, className, jsonModels, null, toInsert);
+                            }
+                        } else {
+                            toInsert = new JSONObject(JSONDataType.OBJECT, null, null);
+                            analyzeFields(resolvedType.asReferenceType().getDeclaredFields(), modelPath, className, jsonModels
+                                    , null, toInsert);
+                        }
                     } catch (Exception e) {
                         System.out.println("Exception2: " + e);
                     }

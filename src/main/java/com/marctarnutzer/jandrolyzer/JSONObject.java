@@ -72,17 +72,24 @@ public class JSONObject {
 
     public String formatJSON() {
         StringBuilder stringBuilder = new StringBuilder();
-        if (this.jsonDataType == JSONDataType.OBJECT) {
-            stringBuilder.append("{");
+        if (this.jsonDataType == JSONDataType.OBJECT || this.jsonDataType == JSONDataType.ARRAY) {
+            if (this.jsonDataType == JSONDataType.ARRAY) {
+                stringBuilder.append("[{");
+            } else {
+                stringBuilder.append("{");
+            }
+
             for (Map.Entry<String, JSONObject> jsonObjectEntry : this.linkedHashMap.entrySet()) {
                 stringBuilder.append("\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue().formatJSON() + ",");
             }
 
             stringBuilder.deleteCharAt(stringBuilder.length() - 1);
 
-            stringBuilder.append("}");
-        } else if (this.jsonDataType == JSONDataType.ARRAY) {
-            // TODO
+            if (this.jsonDataType == JSONDataType.ARRAY) {
+                stringBuilder.append("}]");
+            } else {
+                stringBuilder.append("}");
+            }
         } else {
             if (value != null) {
                 stringBuilder.append("\"" + value.toString() + "\"");
