@@ -167,11 +167,24 @@ public class GSONStrategy {
             boolean shouldSkip = true;
             if (fieldDeclaration.getAnnotations().size() > 0) {
                 for (AnnotationExpr annotationExpr : fieldDeclaration.getAnnotations()) {
-                    if (annotationExpr.getNameAsString().equals("SerializedName") && annotationExpr.isSingleMemberAnnotationExpr()) {
-                        keyString = ((SingleMemberAnnotationExpr) annotationExpr).getMemberValue().asStringLiteralExpr().asString();
+                    if (annotationExpr.getNameAsString().equals("SerializedName")
+                            && annotationExpr.isSingleMemberAnnotationExpr()) {
+                        keyString = ((SingleMemberAnnotationExpr) annotationExpr).getMemberValue()
+                                .asStringLiteralExpr().asString();
                         System.out.println("Annotation rule: Changed key to: " + keyString);
                     } else if (exposeUsed && annotationExpr.getNameAsString().equals("Expose")) {
-                        shouldSkip = false;
+                        if (annotationExpr.isNormalAnnotationExpr()) {
+                            for (MemberValuePair memberValuePair : ((NormalAnnotationExpr) annotationExpr).getPairs()) {
+                                if (memberValuePair.getName().asString().equals("serialize")
+                                        && memberValuePair.getValue().isBooleanLiteralExpr()) {
+                                    if (memberValuePair.getValue().asBooleanLiteralExpr().getValue()) {
+                                        shouldSkip = false;
+                                    }
+                                }
+                            }
+                        } else {
+                            shouldSkip = false;
+                        }
                     }
                 }
             }
