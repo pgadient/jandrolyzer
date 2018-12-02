@@ -133,6 +133,19 @@ public class GSONStrategy {
                                JSONObject jsonObject) {
         System.out.println("Analyzing fields in: " + modelPath);
 
+        // Check if @Expose annotation is used
+        boolean exposeUsed = false;
+        for (ResolvedFieldDeclaration resolvedFieldDeclaration : resolvedFieldDeclarations) {
+            FieldDeclaration fieldDeclaration = ((JavaParserFieldDeclaration)resolvedFieldDeclaration).getWrappedNode();
+            if (fieldDeclaration.getAnnotations().size() > 0) {
+                for (AnnotationExpr annotationExpr : fieldDeclaration.getAnnotations()) {
+                    if (annotationExpr.getNameAsString().equals("Expose")) {
+                        exposeUsed = true;
+                    }
+                }
+            }
+        }
+
         if (jsonObject == null && jsonRoot == null) {
             jsonRoot = new JSONRoot(modelPath, className, null, null);
         }
@@ -148,18 +161,27 @@ public class GSONStrategy {
                 continue;
             }
 
+            String keyString = resolvedFieldDeclaration.getName();
+
             // Check annotation for ignore
-            if (fieldDeclaration.isAnnotationDeclaration()) {
-                for (AnnotationExpr annotationExpr: fieldDeclaration.getAnnotations()) {
-                    System.out.println("Annotation: " + annotationExpr);
+            boolean shouldSkip = true;
+            if (fieldDeclaration.getAnnotations().size() > 0) {
+                for (AnnotationExpr annotationExpr : fieldDeclaration.getAnnotations()) {
+                    if (annotationExpr.getNameAsString().equals("SerializedName") && annotationExpr.isSingleMemberAnnotationExpr()) {
+                        keyString = ((SingleMemberAnnotationExpr) annotationExpr).getMemberValue().asStringLiteralExpr().asString();
+                        System.out.println("Annotation rule: Changed key to: " + keyString);
+                    } else if (exposeUsed && annotationExpr.getNameAsString().equals("Expose")) {
+                        shouldSkip = false;
+                    }
                 }
+            }
+            if (shouldSkip && exposeUsed) {
+                continue;
             }
 
             if (jsonRoot != null && jsonRoot.jsonObject == null) {
                 jsonRoot.jsonObject = new JSONObject(JSONDataType.OBJECT, null, null);
             }
-
-            String keyString = resolvedFieldDeclaration.getName();
 
             JSONObject toInsert = null;
 
