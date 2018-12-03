@@ -336,5 +336,8 @@ public class Main {
 
         HashSet<String> gson = new HashSet<String>();
         libraries.put("com.google.code.gson", gson);
+
+        HashSet<String> moshi = new HashSet<String>();
+        libraries.put("com.squareup.moshi", moshi);
     }
 }

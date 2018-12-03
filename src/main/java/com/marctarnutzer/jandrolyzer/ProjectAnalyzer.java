@@ -19,13 +19,12 @@ import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
-import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 import com.github.javaparser.symbolsolver.utils.SymbolSolverCollectionStrategy;
 import com.github.javaparser.utils.ParserCollectionStrategy;
 import com.github.javaparser.utils.ProjectRoot;
 import com.github.javaparser.utils.SourceRoot;
-import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.GSONStrategy;
+import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.MoshiGSONStrategy;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.ORGJSONStrategy;
 
 import java.io.*;
@@ -50,7 +49,7 @@ public class ProjectAnalyzer implements Runnable {
     private String libraryFolderPath;
     private ORGJSONStrategy orgjsonStrategy = new ORGJSONStrategy();
     private Map<String, JSONRoot> jsonModels = new HashMap<>();
-    private GSONStrategy gsonStrategy = new GSONStrategy();
+    private MoshiGSONStrategy moshiGsonStrategy = new MoshiGSONStrategy();
 
     public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
                            CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
@@ -395,8 +394,8 @@ public class ProjectAnalyzer implements Runnable {
             case "put":
                 orgjsonStrategy.extract(node, path, jsonModels);
                 break;
-            case "addProperty": case "toJson":
-                gsonStrategy.extract(node, path, jsonModels, combinedTypeSolver);
+            case "addProperty": case "toJson": case "adapter":
+                moshiGsonStrategy.extract(node, path, jsonModels, combinedTypeSolver);
                 break;
         }
     }

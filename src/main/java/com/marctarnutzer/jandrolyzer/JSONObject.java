@@ -7,13 +7,16 @@
 
 package com.marctarnutzer.jandrolyzer;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class JSONObject {
 
     public JSONDataType jsonDataType;
     public Map<String, JSONObject> linkedHashMap;
+    public Set<JSONObject> arrayElementsSet;
     public Object value;
 
     public JSONObject(JSONDataType jsonDataType, Object value, String type) {
@@ -51,6 +54,9 @@ public class JSONObject {
 
             if (jsonDataType != null) {
                 this.jsonDataType = jsonDataType;
+                if (this.jsonDataType == JSONDataType.ARRAY) {
+                    this.arrayElementsSet = new HashSet<>();
+                }
             }
         }
 
@@ -72,12 +78,8 @@ public class JSONObject {
 
     public String formatJSON() {
         StringBuilder stringBuilder = new StringBuilder();
-        if (this.jsonDataType == JSONDataType.OBJECT || this.jsonDataType == JSONDataType.ARRAY) {
-            if (this.jsonDataType == JSONDataType.ARRAY) {
-                stringBuilder.append("[{");
-            } else {
-                stringBuilder.append("{");
-            }
+        if (this.jsonDataType == JSONDataType.OBJECT) {
+            stringBuilder.append("{");
 
             for (Map.Entry<String, JSONObject> jsonObjectEntry : this.linkedHashMap.entrySet()) {
                 stringBuilder.append("\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue().formatJSON() + ",");
@@ -85,11 +87,27 @@ public class JSONObject {
 
             stringBuilder.deleteCharAt(stringBuilder.length() - 1);
 
-            if (this.jsonDataType == JSONDataType.ARRAY) {
-                stringBuilder.append("}]");
-            } else {
-                stringBuilder.append("}");
+            stringBuilder.append("}");
+        } else if (this.jsonDataType == JSONDataType.ARRAY) {
+            stringBuilder.append("[");
+
+            if (!this.arrayElementsSet.isEmpty()) {
+                for (JSONObject jsonObject : this.arrayElementsSet) {
+                    stringBuilder.append(jsonObject.formatJSON() + ",");
+                }
+                stringBuilder.deleteCharAt(stringBuilder.length() - 1);
             }
+
+            if (!this.linkedHashMap.isEmpty()) {
+                stringBuilder.append(",");
+                for (Map.Entry<String, JSONObject> jsonObjectEntry : this.linkedHashMap.entrySet()) {
+                    stringBuilder.append("{\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue()
+                            .formatJSON() + "},");
+                }
+                stringBuilder.deleteCharAt(stringBuilder.length() - 1);
+            }
+
+            stringBuilder.append("]");
         } else {
             if (value != null) {
                 stringBuilder.append("\"" + value.toString() + "\"");

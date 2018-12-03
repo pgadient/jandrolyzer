@@ -26,10 +26,43 @@ import com.marctarnutzer.jandrolyzer.JSONObject;
 import com.marctarnutzer.jandrolyzer.JSONRoot;
 import com.marctarnutzer.jandrolyzer.TypeEstimator;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class GSONStrategy {
+public class MoshiGSONStrategy {
+
+    private static HashSet<String> validGSONClasses = new HashSet<>(Arrays.asList(
+            "com.google.gson.Gson",
+            "Gson",
+            "com.google.gson.GsonBuilder",
+            "GsonBuilder"));
+
+    private static HashSet<String> validMoshiClasses = new HashSet<>(Arrays.asList(
+            "com.squareup.moshi.JsonAdapter",
+            "JsonAdapter",
+            "com.squareup.moshi.Moshi",
+            "Moshi"));
+
+    private static HashSet<String> validSimpleJSONDataTypes = new HashSet<>(Arrays.asList(
+            "java.lang.String",
+            "java.lang.Double",
+            "java.lang.Long",
+            "java.lang.Integer",
+            "java.lang.Boolean"));
+
+    private boolean isValidGSONType(String typeString) {
+       return validGSONClasses.contains(typeString);
+    }
+
+    private boolean isValidMoshiType(String typeString) {
+        return validMoshiClasses.contains(typeString);
+    }
+
+    private boolean isValidSimpleJSONDataType(String typeString) {
+        return validSimpleJSONDataTypes.contains(typeString);
+    }
 
     CombinedTypeSolver combinedTypeSolver;
 
@@ -40,6 +73,8 @@ public class GSONStrategy {
             if (((MethodCallExpr) node).getName().asString().equals("addProperty")) {
                 jsonObjectExtraction(node, path, jsonModels);
             } else if (((MethodCallExpr) node).getName().asString().equals("toJson")) {
+                pojoToJsonExtraction(node, path, jsonModels);
+            } else if (((MethodCallExpr) node).getName().asString().equals("adapter")) {
                 pojoToJsonExtraction(node, path, jsonModels);
             }
         }
@@ -56,10 +91,13 @@ public class GSONStrategy {
             String estimatedType = TypeEstimator.estimateTypeName(scopeExpression);
 
             if (estimatedType != null) {
-                if (estimatedType.equals("com.google.gson.Gson") || estimatedType.equals("Gson") ||
-                        estimatedType.equals("com.google.gson.GsonBuilder") || estimatedType.equals("GsonBuilder")) {
+                if (isValidGSONType(estimatedType) || isValidMoshiType(estimatedType)) {
 
-                    System.out.println("Found GSON / GsonBuilder node: " + node + " at path: " + path);
+                    if (isValidGSONType(estimatedType)) {
+                        System.out.println("Found GSON / GsonBuilder node: " + node + " at path: " + path);
+                    } else {
+                        System.out.println("Found JsonAdapter node: " + node + " at path: " + path);
+                    }
 
                     NodeList<Expression> arguments = ((MethodCallExpr) node).getArguments();
                     if (arguments.size() == 1) {
@@ -112,10 +150,31 @@ public class GSONStrategy {
                                                 declarationNode.getClass());
                                     }
                                 } catch (Exception e) {
-                                    System.out.println("Exception: " + e);
+                                    System.out.println("Error while resolving NameExpr type: " + e);
                                 }
+                            } else if (arguments.get(0) instanceof ClassExpr) {
+                                try {
+                                    Type type = ((ClassExpr) arguments.get(0)).getType();
+                                    System.out.println("Class expr type: " + type);
+
+                                    if (type.isClassOrInterfaceType()) {
+                                        System.out.println("Fields: " + type.asClassOrInterfaceType().resolve().getDeclaredFields());
+
+                                        String modelPath = node.findCompilationUnit().get().getStorage().get()
+                                                .getSourceRoot() + "/" + type.asClassOrInterfaceType().resolve()
+                                                .getTypeDeclaration().getQualifiedName()
+                                                .replace(".", "/") + ".java";
+
+                                        analyzeFields(type.asClassOrInterfaceType().resolve().getDeclaredFields(), modelPath,
+                                                type.asClassOrInterfaceType().getName().asString(),
+                                                jsonModels, null, null);
+                                    }
+                                } catch (Exception e) {
+                                    System.out.println("Error while resolving ClassExpr type: " + e);
+                                }
+
                             } else {
-                                System.out.println("Not a name expr: " + arguments.get(0).getClass());
+                                System.out.println("Not a name nor class expr: " + arguments.get(0).getClass());
                             }
                         }
                     }
@@ -172,6 +231,14 @@ public class GSONStrategy {
                         keyString = ((SingleMemberAnnotationExpr) annotationExpr).getMemberValue()
                                 .asStringLiteralExpr().asString();
                         System.out.println("Annotation rule: Changed key to: " + keyString);
+                    } else if (annotationExpr.getNameAsString().equals("Json")
+                            && annotationExpr.isNormalAnnotationExpr()) {
+                        for (MemberValuePair memberValuePair : ((NormalAnnotationExpr) annotationExpr).getPairs()) {
+                            if (memberValuePair.getName().asString().equals("name")
+                                    && memberValuePair.getValue().isStringLiteralExpr()) {
+                                keyString = memberValuePair.getValue().asStringLiteralExpr().getValue();
+                            }
+                        }
                     } else if (exposeUsed && annotationExpr.getNameAsString().equals("Expose")) {
                         if (annotationExpr.isNormalAnnotationExpr()) {
                             for (MemberValuePair memberValuePair : ((NormalAnnotationExpr) annotationExpr).getPairs()) {
@@ -224,11 +291,7 @@ public class GSONStrategy {
                 String resolvedReferenceTypeString = resolvedFieldDeclaration.getType().asReferenceType().
                         getQualifiedName();
                 System.out.println("!TypeString" + resolvedReferenceTypeString);
-                if (resolvedReferenceTypeString.equals("java.lang.String")
-                        || resolvedReferenceTypeString.equals("java.lang.Double")
-                        || resolvedReferenceTypeString.equals("java.lang.Long")
-                        || resolvedReferenceTypeString.equals("java.lang.Integer")
-                        || resolvedReferenceTypeString.equals("java.lang.Boolean")) {
+                if (isValidSimpleJSONDataType(resolvedReferenceTypeString)) {
                     toInsert = new JSONObject(null, null, resolvedReferenceTypeString);
                 } else {
                     try {
@@ -240,7 +303,8 @@ public class GSONStrategy {
                         System.out.println("Field type: " + resolvedType.asReferenceType());
                         System.out.println("Type fields: " + resolvedType.asReferenceType().getDeclaredFields());
 
-                        System.out.println("Collection: " + (fieldType.asClassOrInterfaceType().getTypeArguments()));
+                        System.out.println("Field type (asClassOrInterfaceType): " +
+                                (fieldType.asClassOrInterfaceType().getTypeArguments()));
 
                         if (TypeEstimator.extendsCollection(resolvedReferenceTypeString)) {
                             System.out.println("Its a collection type");
@@ -252,7 +316,23 @@ public class GSONStrategy {
                                 Type typeArgumentType = fieldType.asClassOrInterfaceType().getTypeArguments().get().get(0);
                                 ResolvedType resolvedTypeArgType = JavaParserFacade.get(combinedTypeSolver).convertToUsage(typeArgumentType);
 
-                                analyzeFields(resolvedTypeArgType.asReferenceType().getDeclaredFields(), modelPath, className, jsonModels, null, toInsert);
+                                if (resolvedTypeArgType.isReferenceType()) {
+                                    if (isValidSimpleJSONDataType(resolvedTypeArgType.asReferenceType().getQualifiedName())) {
+                                        toInsert.arrayElementsSet.add(new JSONObject(null, null,
+                                                resolvedTypeArgType.asReferenceType().getQualifiedName()));
+                                    } else {
+                                        analyzeFields(resolvedTypeArgType.asReferenceType().getDeclaredFields(), modelPath,
+                                                className, jsonModels, null, toInsert);
+                                    }
+                                } else if (resolvedTypeArgType.isPrimitive()) {
+                                    String valueType = resolvedTypeArgType.asPrimitive().getBoxTypeQName();
+
+                                    if (valueType == null) {
+                                        continue;
+                                    }
+
+                                    toInsert.arrayElementsSet.add(new JSONObject(null, null, valueType));
+                                }
                             }
                         } else {
                             toInsert = new JSONObject(JSONDataType.OBJECT, null, null);
@@ -260,7 +340,7 @@ public class GSONStrategy {
                                     , null, toInsert);
                         }
                     } catch (Exception e) {
-                        System.out.println("Exception2: " + e);
+                        System.out.println("Error while analyzing field: " + e);
                     }
                 }
             }
@@ -268,7 +348,6 @@ public class GSONStrategy {
             if (toInsert == null) {
                 continue;
             }
-            System.out.println("toInsert passed");
 
             if (jsonRoot != null) {
                 System.out.println("Putting in jsonRoot... " + keyString);
