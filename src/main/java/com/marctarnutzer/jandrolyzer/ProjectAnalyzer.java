@@ -123,7 +123,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("WeatherInfo.java")) {
+                        if (name.equals("MessagingControllerCommands.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {

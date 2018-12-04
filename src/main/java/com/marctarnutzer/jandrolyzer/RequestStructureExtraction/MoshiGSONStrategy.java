@@ -320,6 +320,9 @@ public class MoshiGSONStrategy {
                                     if (isValidSimpleJSONDataType(resolvedTypeArgType.asReferenceType().getQualifiedName())) {
                                         toInsert.arrayElementsSet.add(new JSONObject(null, null,
                                                 resolvedTypeArgType.asReferenceType().getQualifiedName()));
+                                    } else if (resolvedTypeArgType.asReferenceType().getTypeDeclaration().isEnum()) {
+                                        toInsert.arrayElementsSet.add(new JSONObject(null, null,
+                                                "java.lang.String"));
                                     } else {
                                         analyzeFields(resolvedTypeArgType.asReferenceType().getDeclaredFields(), modelPath,
                                                 className, jsonModels, null, toInsert);
@@ -355,6 +358,10 @@ public class MoshiGSONStrategy {
                                                 .getQualifiedName())) {
                                             toInsert.linkedHashMap.put("", new JSONObject(null, null,
                                                     resolvedSecondTypeArgumentType.asReferenceType().getQualifiedName()));
+                                        } else if (resolvedSecondTypeArgumentType.asReferenceType().getTypeDeclaration()
+                                                .isEnum()) {
+                                            toInsert.linkedHashMap.put("", new JSONObject(null, null,
+                                                    "java.lang.String"));
                                         } else {
                                             JSONObject jsonArrayElement = new JSONObject(JSONDataType.OBJECT, null, null);
                                             toInsert.linkedHashMap.put("", jsonArrayElement);
@@ -374,6 +381,9 @@ public class MoshiGSONStrategy {
                                     continue;
                                 }
                             }
+                        } else if (resolvedType.asReferenceType().getTypeDeclaration().isEnum()) {
+                            System.out.println("Its an enum type");
+                            toInsert = new JSONObject(null, null, "java.lang.String");
                         } else {
                             toInsert = new JSONObject(JSONDataType.OBJECT, null, null);
                             analyzeFields(resolvedType.asReferenceType().getDeclaredFields(), modelPath, className, jsonModels
