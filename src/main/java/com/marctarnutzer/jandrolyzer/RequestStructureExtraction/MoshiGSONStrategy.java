@@ -333,6 +333,46 @@ public class MoshiGSONStrategy {
 
                                     toInsert.arrayElementsSet.add(new JSONObject(null, null, valueType));
                                 }
+                            } else if (fieldType.asClassOrInterfaceType().getTypeArguments().isPresent() &&
+                                    fieldType.asClassOrInterfaceType().getTypeArguments().get().size() == 2) {
+
+                                Type firstTypeArgumentType = fieldType.asClassOrInterfaceType().getTypeArguments().get().get(0);
+                                ResolvedType resolvedFirstTypeArgumentType = JavaParserFacade.get(combinedTypeSolver)
+                                        .convertToUsage(firstTypeArgumentType);
+
+                                if (resolvedFirstTypeArgumentType.isReferenceType() &&
+                                        resolvedFirstTypeArgumentType.asReferenceType().getQualifiedName()
+                                                .equals("java.lang.String")) {
+                                    System.out.println("Inserting a JSON Array for map type...");
+                                    toInsert = new JSONObject(JSONDataType.ARRAY, null, null);
+
+                                    Type secondTypeArgumentType = fieldType.asClassOrInterfaceType().getTypeArguments().get().get(1);
+                                    ResolvedType resolvedSecondTypeArgumentType = JavaParserFacade.get(combinedTypeSolver)
+                                            .convertToUsage(secondTypeArgumentType);
+
+                                    if (resolvedSecondTypeArgumentType.isReferenceType()) {
+                                        if (isValidSimpleJSONDataType(resolvedSecondTypeArgumentType.asReferenceType()
+                                                .getQualifiedName())) {
+                                            toInsert.linkedHashMap.put("", new JSONObject(null, null,
+                                                    resolvedSecondTypeArgumentType.asReferenceType().getQualifiedName()));
+                                        } else {
+                                            JSONObject jsonArrayElement = new JSONObject(JSONDataType.OBJECT, null, null);
+                                            toInsert.linkedHashMap.put("", jsonArrayElement);
+                                            analyzeFields(resolvedSecondTypeArgumentType.asReferenceType().getDeclaredFields(),
+                                                    modelPath, className, jsonModels, null, jsonArrayElement);
+                                        }
+                                    } else if (resolvedSecondTypeArgumentType.isPrimitive()) {
+                                        String valueType = resolvedSecondTypeArgumentType.asPrimitive().getBoxTypeQName();
+
+                                        if (valueType == null) {
+                                            continue;
+                                        }
+
+                                        toInsert.linkedHashMap.put("", new JSONObject(null, null, valueType));
+                                    }
+                                } else {
+                                    continue;
+                                }
                             }
                         } else {
                             toInsert = new JSONObject(JSONDataType.OBJECT, null, null);

@@ -99,7 +99,9 @@ public class JSONObject {
             }
 
             if (!this.linkedHashMap.isEmpty()) {
-                stringBuilder.append(",");
+                if (!this.arrayElementsSet.isEmpty()) {
+                    stringBuilder.append(",");
+                }
                 for (Map.Entry<String, JSONObject> jsonObjectEntry : this.linkedHashMap.entrySet()) {
                     stringBuilder.append("{\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue()
                             .formatJSON() + "},");

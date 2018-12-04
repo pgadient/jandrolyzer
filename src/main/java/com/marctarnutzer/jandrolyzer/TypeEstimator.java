@@ -51,6 +51,7 @@ public class TypeEstimator {
     static HashSet<String> collectionHashSet = new HashSet<>(Arrays.asList(
             "java.util.List",
             "java.util.ArrayList",
-            "java.util.Set"));
+            "java.util.Set",
+            "java.util.Map"));
 
 }
