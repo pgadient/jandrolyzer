@@ -10,6 +10,7 @@ package com.marctarnutzer.jandrolyzer;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
@@ -75,8 +76,6 @@ public class Main {
 
         System.out.println("All done!");
     }
-
-
 
     private static String argToPath(List<String> arg) {
         StringBuilder stringBuilder = new StringBuilder();
@@ -177,6 +176,8 @@ public class Main {
         }*/
 
         saveResults(projectsPath, projects);
+
+        printStatistics(projects);
     }
 
     static void saveResults(String path, ArrayBlockingQueue<Project> projects) {
@@ -209,6 +210,75 @@ public class Main {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+
+        // Save found JSON models
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(path + "/JSONModels.log"));
+            for (Project project : projects) {
+                for (JSONRoot jsonRoot : project.jsonModels.values()) {
+                    writer.write(jsonRoot.logInfoAndJSON());
+                }
+            }
+            writer.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void printStatistics(ArrayBlockingQueue<Project> projects) {
+        System.out.println("Projects analyzed: " + projects.size());
+
+        HashMap<String, Integer> librariesOccurrences = new HashMap<>();
+        for (String library : libraries.keySet()) {
+            librariesOccurrences.put(library, 0);
+        }
+
+        HashMap<String, Integer> jsonLibsModelsOccurrences = new HashMap<>();
+        jsonLibsModelsOccurrences.put("com.google.code.gson", 0);
+        jsonLibsModelsOccurrences.put("com.squareup.moshi", 0);
+        jsonLibsModelsOccurrences.put("org.json", 0);
+
+        int projectsWithLibraries = 0;
+        int projectsWithExtractedJSONModels = 0;
+
+        for (Project project : projects) {
+            for (String libInProject : project.jsonLibraries) {
+                librariesOccurrences.put(libInProject, librariesOccurrences.get(libInProject) + 1);
+            }
+
+            if (!project.jsonLibraries.isEmpty()) {
+                projectsWithLibraries++;
+            }
+
+            if (!project.jsonModels.isEmpty()) {
+                projectsWithExtractedJSONModels++;
+            }
+
+            for (JSONRoot jsonRoot : project.jsonModels.values()) {
+                jsonLibsModelsOccurrences.put(jsonRoot.library, jsonLibsModelsOccurrences.get(jsonRoot.library) + 1);
+            }
+        }
+
+        System.out.println("Projects with jsonLibraries: " + projectsWithLibraries);
+        System.out.println("Projects with extracted JSON Models: " + projectsWithExtractedJSONModels);
+
+        Map<String, Integer> sortedLO = librariesOccurrences.entrySet()
+                .stream().sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v2, LinkedHashMap::new));
+
+        System.out.println("Libraries usage charts:");
+        for (Map.Entry<String, Integer> entry : sortedLO.entrySet()) {
+            System.out.println("    Library: " + entry.getKey() + ", occurrences: " + entry.getValue());
+        }
+
+        Map<String, Integer> sortedLMO = jsonLibsModelsOccurrences.entrySet()
+                .stream().sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v2, LinkedHashMap::new));
+
+        System.out.println("Found JSON models per library usage charts:");
+        for (Map.Entry<String, Integer> entry : sortedLMO.entrySet()) {
+            System.out.println("    Library: " + entry.getKey() + ", models found: " + entry.getValue());
         }
     }
 

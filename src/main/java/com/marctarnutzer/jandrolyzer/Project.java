@@ -7,13 +7,15 @@
 
 package com.marctarnutzer.jandrolyzer;
 
-import java.util.LinkedList;
+import java.util.*;
 
 public class Project {
 
     public String name;
     public String path;
     public LinkedList<Snippet> snippets = new LinkedList<Snippet>();
+    public Map<String, JSONRoot> jsonModels = new HashMap<>();
+    public Set<String> jsonLibraries = new HashSet<>();
 
     public Project(String path, String name) {
         this.path = path;
@@ -22,6 +24,10 @@ public class Project {
 
     public void addSnippet(Snippet snippet) {
         this.snippets.add(snippet);
+    }
+
+    public void addLibrary(String library) {
+        this.jsonLibraries.add(library);
     }
 
     public String toString() {

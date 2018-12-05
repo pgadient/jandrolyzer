@@ -136,6 +136,8 @@ public class ORGJSONStrategy {
             jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
         }
 
+        jsonRoot.library = "org.json";
+
         System.out.println("Added to JSONMap");
     }
 

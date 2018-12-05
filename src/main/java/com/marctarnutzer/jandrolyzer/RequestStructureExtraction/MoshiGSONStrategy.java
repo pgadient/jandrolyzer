@@ -64,7 +64,8 @@ public class MoshiGSONStrategy {
         return validSimpleJSONDataTypes.contains(typeString);
     }
 
-    CombinedTypeSolver combinedTypeSolver;
+    private CombinedTypeSolver combinedTypeSolver;
+    private String scopeExprTypeString = null;
 
     public void extract(Node node, String path, Map<String, JSONRoot> jsonModels, CombinedTypeSolver combinedTypeSolver) {
         this.combinedTypeSolver = combinedTypeSolver;
@@ -89,6 +90,8 @@ public class MoshiGSONStrategy {
         Expression scopeExpression = ((MethodCallExpr) node).getScope().orElse(null);
         if (scopeExpression != null) {
             String estimatedType = TypeEstimator.estimateTypeName(scopeExpression);
+
+            scopeExprTypeString = estimatedType;
 
             if (estimatedType != null) {
                 if (isValidGSONType(estimatedType) || isValidMoshiType(estimatedType)) {
@@ -411,6 +414,12 @@ public class MoshiGSONStrategy {
 
         if (jsonRoot != null && jsonRoot.jsonObject != null && !jsonRoot.jsonObject.linkedHashMap.isEmpty()) {
             jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
+
+            if (isValidGSONType(scopeExprTypeString)) {
+                jsonRoot.library = "com.google.code.gson";
+            } else {
+                jsonRoot.library = "com.squareup.moshi";
+            }
         }
 
     }

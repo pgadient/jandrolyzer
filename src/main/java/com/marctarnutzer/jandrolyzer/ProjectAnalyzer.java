@@ -162,6 +162,7 @@ public class ProjectAnalyzer implements Runnable {
     private void addLibrariesToSymbolSolver(SymbolSolverCollectionStrategy symbolSolverCollectionStrategy, HashMap<String, String> librariesToInclude) {
         for (Map.Entry<String, String> entry : librariesToInclude.entrySet()) {
             File libraryFolder = new File(this.libraryFolderPath + "/" + entry.getKey() + "-" + entry.getValue());
+            this.project.jsonLibraries.add(entry.getKey());
             if (libraryFolder.exists()) {
                 symbolSolverCollectionStrategy.collect(libraryFolder.toPath());
                 System.out.println("Added library: " + libraryFolder.getPath());
@@ -512,6 +513,8 @@ public class ProjectAnalyzer implements Runnable {
     @Override
     public void run() {
         analyze();
+
+        this.project.jsonModels = jsonModels;
 
         System.out.println(jsonModels.size() + " detected JSON models:");
         for (Map.Entry<String, JSONRoot> jsonRootEntry : this.jsonModels.entrySet()) {
