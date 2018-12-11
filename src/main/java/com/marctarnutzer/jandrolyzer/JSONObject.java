@@ -30,19 +30,19 @@ public class JSONObject {
             }
             
             switch (switchValue) {
-                case "java.lang.String":
+                case "java.lang.String": case "<STRING>":
                     this.jsonDataType = JSONDataType.STRING;
                     break;
-                case "java.lang.Double": case "java.lang.Long":
+                case "java.lang.Double": case "java.lang.Float": case "<DOUBLE>": case "<FLOAT>":
                     this.jsonDataType = JSONDataType.NUMBER_DOUBLE;
                     break;
-                case "java.lang.Integer":
+                case "java.lang.Integer": case "<INTEGER>":
                     this.jsonDataType = JSONDataType.NUMBER_INT;
                     break;
-                case "java.lang.Boolean":
+                case "java.lang.Boolean": case "<BOOLEAN>":
                     this.jsonDataType = JSONDataType.BOOLEAN;
                     break;
-                case "NULL":
+                case "NULL": case "<NULL>":
                     this.jsonDataType = JSONDataType.NULL;
                     break;
                 default:

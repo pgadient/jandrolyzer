@@ -263,6 +263,8 @@ public class ProjectAnalyzer implements Runnable {
             analyzeCastExpr(node, path, name);
         } else if (node instanceof StringLiteralExpr) {
             analyzeStringLiteralExpr(node, path);
+        } else if (node instanceof BinaryExpr) {
+            analyzeBinaryExpr(node, path);
         }
 
         for (Node child : node.getChildNodes()) {
@@ -271,7 +273,11 @@ public class ProjectAnalyzer implements Runnable {
     }
 
     private void analyzeStringLiteralExpr(Node node, String path) {
-        jsonStringStrategy.parse((StringLiteralExpr)node, path, jsonModels);
+        jsonStringStrategy.parse((StringLiteralExpr) node, path, jsonModels);
+    }
+
+    private void analyzeBinaryExpr(Node node, String path) {
+        jsonStringStrategy.parse((BinaryExpr) node, path, jsonModels);
     }
 
     private void analyzeObjectCreationExpr(Node node, String path, String name) {

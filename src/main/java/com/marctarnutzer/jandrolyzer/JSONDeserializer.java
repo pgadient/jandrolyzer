@@ -68,7 +68,16 @@ public class JSONDeserializer {
 
         if (jsonElement.isJsonPrimitive()) {
             if (jsonElement.getAsJsonPrimitive().isString()) {
-                toInsert = new JSONObject(null, jsonElement.getAsJsonPrimitive().getAsString(), null);
+                if (jsonElement.getAsJsonPrimitive().getAsString().equals("<STRING>")
+                        || jsonElement.getAsJsonPrimitive().getAsString().equals("<DOUBLE>")
+                        || jsonElement.getAsJsonPrimitive().getAsString().equals("<FLOAT>")
+                        || jsonElement.getAsJsonPrimitive().getAsString().equals("<INTEGER>")
+                        || jsonElement.getAsJsonPrimitive().getAsString().equals("<BOOLEAN>")
+                        || jsonElement.getAsJsonPrimitive().getAsString().equals("<NULL>")) {
+                    toInsert = new JSONObject(null, null, jsonElement.getAsJsonPrimitive().getAsString());
+                } else {
+                    toInsert = new JSONObject(null, jsonElement.getAsJsonPrimitive().getAsString(), null);
+                }
             } else if (jsonElement.getAsJsonPrimitive().isNumber()) {
                 Number number = jsonElement.getAsJsonPrimitive().getAsNumber();
                 if (number.intValue() == number.doubleValue()) {
