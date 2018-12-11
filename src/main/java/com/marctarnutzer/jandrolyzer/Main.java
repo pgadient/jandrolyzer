@@ -302,7 +302,7 @@ public class Main {
     }
 
     static void collectFieldOccurrences(JSONObject jsonObject, Map<String, Integer> fieldNameOccurrences) {
-        if (!jsonObject.linkedHashMap.isEmpty()) {
+        if (jsonObject.linkedHashMap != null && !jsonObject.linkedHashMap.isEmpty()) {
             for (Map.Entry<String, JSONObject> entry: jsonObject.linkedHashMap.entrySet()) {
                 if (fieldNameOccurrences.containsKey(entry.getKey())) {
                     fieldNameOccurrences.put(entry.getKey(), fieldNameOccurrences.get(entry.getKey()) + 1);
@@ -314,6 +314,10 @@ public class Main {
                         || entry.getValue().jsonDataType == JSONDataType.OBJECT) {
                     collectFieldOccurrences(entry.getValue(), fieldNameOccurrences);
                 }
+            }
+        } else if (jsonObject.arrayElementsSet != null && !jsonObject.arrayElementsSet.isEmpty()) {
+            for (JSONObject jo : jsonObject.arrayElementsSet) {
+                collectFieldOccurrences(jo, fieldNameOccurrences);
             }
         }
     }

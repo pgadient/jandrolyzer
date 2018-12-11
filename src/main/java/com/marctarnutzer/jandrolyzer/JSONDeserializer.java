@@ -45,7 +45,9 @@ public class JSONDeserializer {
             while (iterator.hasNext()) {
                 JSONObject toInsert = jsonObjectToInsert(iterator.next());
 
-                jsonObject.arrayElementsSet.add(toInsert);
+                if (toInsert != null) {
+                    jsonObject.arrayElementsSet.add(toInsert);
+                }
             }
         } else if (jsonElement.isJsonObject()) {
             JsonObject parsedJsonObject = jsonElement.getAsJsonObject();
@@ -57,7 +59,9 @@ public class JSONDeserializer {
 
                 JSONObject toInsert = jsonObjectToInsert(entry.getValue());
 
-                jsonObject.linkedHashMap.put(entry.getKey(), toInsert);
+                if (toInsert != null) {
+                    jsonObject.linkedHashMap.put(entry.getKey(), toInsert);
+                }
             }
 
         }
@@ -104,8 +108,7 @@ public class JSONDeserializer {
     }
 
     private boolean isValidJSONFormat(String jsonString) {
-        if (!((jsonString.startsWith("{") && jsonString.endsWith("}"))
-                || (jsonString.startsWith("[") && jsonString.endsWith("]")))) {
+        if (!(jsonString.startsWith("{") && jsonString.endsWith("}"))) {
             return false;
         }
 
