@@ -47,7 +47,7 @@ public class Main {
     private static boolean multithreaded = false;
 
     // HashSet not ordered according to insertion order
-    static HashMap<String, HashSet<String>> libraries = new HashMap<String, HashSet<String>>();
+    static HashMap<String, HashSet<String>> libraries = new HashMap<>();
 
     public static void main(String args[]) {
         initLibraries();
@@ -139,7 +139,7 @@ public class Main {
             }
         });
 
-        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<Project>(projectFolders.length);
+        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<>(projectFolders.length);
         CountDownLatch latch = new CountDownLatch(projectFolders.length);
 
         Semaphore concurrentAnalyzers;
@@ -240,6 +240,7 @@ public class Main {
         jsonLibsModelsOccurrences.put("org.json", 0);
 
         int projectsWithLibraries = 0;
+        int projectsWithOneLibrary = 0;
         int projectsWithExtractedJSONModels = 0;
 
         for (Project project : projects) {
@@ -249,6 +250,9 @@ public class Main {
 
             if (!project.jsonLibraries.isEmpty()) {
                 projectsWithLibraries++;
+                if (project.jsonLibraries.size() == 1) {
+                    projectsWithOneLibrary++;
+                }
             }
 
             if (!project.jsonModels.isEmpty()) {
@@ -260,7 +264,8 @@ public class Main {
             }
         }
 
-        System.out.println("Projects with jsonLibraries: " + projectsWithLibraries);
+        System.out.println("Projects with libraries: " + projectsWithLibraries);
+        System.out.println("Projects with one library: " + projectsWithOneLibrary);
         System.out.println("Projects with extracted JSON Models: " + projectsWithExtractedJSONModels);
 
         Map<String, Integer> sortedLO = librariesOccurrences.entrySet()

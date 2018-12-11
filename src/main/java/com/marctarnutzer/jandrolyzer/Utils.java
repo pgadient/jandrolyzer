@@ -34,4 +34,12 @@ public class Utils {
         return retNode;
     }
 
+    public static String removeEscapeSequencesFrom(String inputString) {
+        inputString = inputString.replace("\\\"", "\"");
+        inputString = inputString.replace("\\'", "'");
+        inputString = inputString.replace("\\\\", "\\");
+
+        return inputString;
+    }
+
 }

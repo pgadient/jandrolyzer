@@ -24,6 +24,7 @@ import com.github.javaparser.symbolsolver.utils.SymbolSolverCollectionStrategy;
 import com.github.javaparser.utils.ParserCollectionStrategy;
 import com.github.javaparser.utils.ProjectRoot;
 import com.github.javaparser.utils.SourceRoot;
+import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.JSONStringStrategy;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.MoshiGSONStrategy;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.ORGJSONStrategy;
 
@@ -50,6 +51,7 @@ public class ProjectAnalyzer implements Runnable {
     private ORGJSONStrategy orgjsonStrategy = new ORGJSONStrategy();
     private Map<String, JSONRoot> jsonModels = new HashMap<>();
     private MoshiGSONStrategy moshiGsonStrategy = new MoshiGSONStrategy();
+    private JSONStringStrategy jsonStringStrategy = new JSONStringStrategy();
 
     public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
                            CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
@@ -68,6 +70,8 @@ public class ProjectAnalyzer implements Runnable {
     }
 
     public void analyze() {
+        System.out.println("Analyzing project: " + this.project.path);
+
         ProjectRoot projectRoot;
         if (enableSymbolSolving) {
             this.combinedTypeSolver = new CombinedTypeSolver();
@@ -123,7 +127,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("MessagingControllerCommands.java")) {
+                        if (name.equals("Flash.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -257,11 +261,17 @@ public class ProjectAnalyzer implements Runnable {
             analyzeMethodCallExpr(node, path, name);
         } else if (node instanceof CastExpr) {
             analyzeCastExpr(node, path, name);
+        } else if (node instanceof StringLiteralExpr) {
+            analyzeStringLiteralExpr(node, path);
         }
 
         for (Node child : node.getChildNodes()) {
             analyzeNodeSS(child, path, name);
         }
+    }
+
+    private void analyzeStringLiteralExpr(Node node, String path) {
+        jsonStringStrategy.parse((StringLiteralExpr)node, path, jsonModels);
     }
 
     private void analyzeObjectCreationExpr(Node node, String path, String name) {

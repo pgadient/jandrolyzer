@@ -302,7 +302,8 @@ public class MoshiGSONStrategy {
                         System.out.println("Field declaration: " + fieldDeclaration + ", type: " + fieldType);
 
                         // TODO: Ask maintainers why this approach is necessary and why fieldType.resolve() doesn't work
-                        ResolvedType resolvedType = JavaParserFacade.get(combinedTypeSolver).convertToUsage(fieldType);
+                        ResolvedType resolvedType = fieldType.resolve();
+                        //ResolvedType resolvedType = JavaParserFacade.get(combinedTypeSolver).convertToUsage(fieldType);
                         System.out.println("Field type: " + resolvedType.asReferenceType());
                         System.out.println("Type fields: " + resolvedType.asReferenceType().getDeclaredFields());
 

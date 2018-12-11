@@ -13,6 +13,7 @@ public class JSONRoot {
     public String className;
     public String methodName;
     public String scopeName;
+    public String salt;
     public String library;
     public JSONObject jsonObject;
 
@@ -25,7 +26,7 @@ public class JSONRoot {
 
     //TODO: Maybe change to path & className & [the whole class, constructor, method, etc. chain separated by &]
     public String getIdentifier() {
-        return path + "&" + className + "&" + methodName + "&" + scopeName;
+        return path + "&" + className + "&" + methodName + "&" + scopeName + "&" + salt;
     }
 
     public String toString() {
