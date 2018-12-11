@@ -94,13 +94,20 @@ public class ORGJSONStrategy {
                             } else if (arguments.get(1) instanceof BooleanLiteralExpr) {
                                 Boolean found = ((BooleanLiteralExpr)arguments.get(1)).getValue();
                                 valueObject = found;
-                            } else if (arguments.get(1) instanceof DoubleLiteralExpr) {
+                            }
+                            // As of right now DoubleLiteralExpr represents both doubles and floats
+                            // (waiting for JavaParser update...)
+                            else if (arguments.get(1) instanceof DoubleLiteralExpr) {
                                 Double found = ((DoubleLiteralExpr)arguments.get(1)).asDouble();
                                 valueObject = found;
-                            } else if (arguments.get(1) instanceof LongLiteralExpr) {
+                            }
+                            /*
+                            else if (arguments.get(1) instanceof LongLiteralExpr) {
                                 Double found = (double)((LongLiteralExpr)arguments.get(1)).asLong();
                                 valueObject = found;
-                            } else if (arguments.get(1) instanceof NullLiteralExpr) {
+                            }
+                             */
+                            else if (arguments.get(1) instanceof NullLiteralExpr) {
                                 valueType = "NULL";
                             } else {
                                 // TODO: Add option to allow unknown expressions or just add in as string? let's see...

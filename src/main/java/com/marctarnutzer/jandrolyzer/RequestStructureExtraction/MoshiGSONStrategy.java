@@ -48,7 +48,7 @@ public class MoshiGSONStrategy {
     private static HashSet<String> validSimpleJSONDataTypes = new HashSet<>(Arrays.asList(
             "java.lang.String",
             "java.lang.Double",
-            "java.lang.Long",
+            "java.lang.Float",
             "java.lang.Integer",
             "java.lang.Boolean"));
 

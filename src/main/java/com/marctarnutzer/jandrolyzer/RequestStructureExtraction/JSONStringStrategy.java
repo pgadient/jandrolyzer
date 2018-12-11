@@ -29,6 +29,7 @@ public class JSONStringStrategy {
 
         if (jsonRoot != null) {
             jsonRoot.salt = UUID.randomUUID().toString().replace("-", "");
+            jsonRoot.library = "noLib.StringLiteralExpr";
             jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
         }
     }
@@ -51,6 +52,7 @@ public class JSONStringStrategy {
 
         if (jsonRoot != null) {
             jsonRoot.salt = UUID.randomUUID().toString().replace("-", "");
+            jsonRoot.library = "noLib.BinaryExpr";
             jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
         }
     }
@@ -78,7 +80,7 @@ public class JSONStringStrategy {
         } else if (rightExpression instanceof StringLiteralExpr) {
             toReturn = toReturn + rightExpression.asStringLiteralExpr().getValue();
         } else {
-            if (toReturn.endsWith("\"")) {
+            if (toReturn != null && toReturn.endsWith("\"")) {
                 toReturn = toReturn + solvedExpressionType(rightExpression);
             } else {
                 toReturn = toReturn + "\"" + solvedExpressionType(rightExpression) + "\"";

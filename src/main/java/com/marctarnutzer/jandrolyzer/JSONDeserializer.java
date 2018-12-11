@@ -104,6 +104,11 @@ public class JSONDeserializer {
     }
 
     private boolean isValidJSONFormat(String jsonString) {
+        if (!((jsonString.startsWith("{") && jsonString.endsWith("}"))
+                || (jsonString.startsWith("[") && jsonString.endsWith("]")))) {
+            return false;
+        }
+
         boolean isValidJSON;
 
         try {

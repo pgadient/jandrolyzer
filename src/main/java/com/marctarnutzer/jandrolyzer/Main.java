@@ -238,10 +238,14 @@ public class Main {
         jsonLibsModelsOccurrences.put("com.google.code.gson", 0);
         jsonLibsModelsOccurrences.put("com.squareup.moshi", 0);
         jsonLibsModelsOccurrences.put("org.json", 0);
+        jsonLibsModelsOccurrences.put("noLib.StringLiteralExpr", 0);
+        jsonLibsModelsOccurrences.put("noLib.BinaryExpr", 0);
 
         int projectsWithLibraries = 0;
         int projectsWithOneLibrary = 0;
         int projectsWithExtractedJSONModels = 0;
+
+        Map<String, Integer> fieldNameOccurrences = new HashMap<>();
 
         for (Project project : projects) {
             for (String libInProject : project.jsonLibraries) {
@@ -261,6 +265,8 @@ public class Main {
 
             for (JSONRoot jsonRoot : project.jsonModels.values()) {
                 jsonLibsModelsOccurrences.put(jsonRoot.library, jsonLibsModelsOccurrences.get(jsonRoot.library) + 1);
+
+                collectFieldOccurrences(jsonRoot.jsonObject, fieldNameOccurrences);
             }
         }
 
@@ -284,6 +290,31 @@ public class Main {
         System.out.println("Found JSON models per library usage charts:");
         for (Map.Entry<String, Integer> entry : sortedLMO.entrySet()) {
             System.out.println("    Library: " + entry.getKey() + ", models found: " + entry.getValue());
+        }
+
+        System.out.println("Field names occurrences in detected JSON models:");
+        Map<String, Integer> sortedFNO = fieldNameOccurrences.entrySet().stream()
+                .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v2, LinkedHashMap::new));
+        for (Map.Entry<String, Integer> entry : sortedFNO.entrySet()) {
+            System.out.println("    Field name: " + entry.getKey() + ", occurrences: " + entry.getValue());
+        }
+    }
+
+    static void collectFieldOccurrences(JSONObject jsonObject, Map<String, Integer> fieldNameOccurrences) {
+        if (!jsonObject.linkedHashMap.isEmpty()) {
+            for (Map.Entry<String, JSONObject> entry: jsonObject.linkedHashMap.entrySet()) {
+                if (fieldNameOccurrences.containsKey(entry.getKey())) {
+                    fieldNameOccurrences.put(entry.getKey(), fieldNameOccurrences.get(entry.getKey()) + 1);
+                } else {
+                    fieldNameOccurrences.put(entry.getKey(), 1);
+                }
+
+                if (entry.getValue().jsonDataType == JSONDataType.ARRAY
+                        || entry.getValue().jsonDataType == JSONDataType.OBJECT) {
+                    collectFieldOccurrences(entry.getValue(), fieldNameOccurrences);
+                }
+            }
         }
     }
 
