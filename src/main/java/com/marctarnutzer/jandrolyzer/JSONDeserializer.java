@@ -32,7 +32,17 @@ public class JSONDeserializer {
         JSONRoot jsonRoot = new JSONRoot(path, null, null, null);
         jsonRoot.jsonObject = new JSONObject(JSONDataType.OBJECT, null, null);
 
-        JsonElement jsonElement = jsonParser.parse(jsonString);
+        JsonElement jsonElement;
+        try {
+            jsonElement = jsonParser.parse(jsonString);
+        } catch (Exception e) {
+            return null;
+        }
+
+        if (jsonElement == null) {
+            return null;
+        }
+
         deserialize(jsonElement, jsonRoot.jsonObject);
 
         return jsonRoot;
@@ -108,7 +118,7 @@ public class JSONDeserializer {
     }
 
     private boolean isValidJSONFormat(String jsonString) {
-        if (!(jsonString.startsWith("{") && jsonString.endsWith("}"))) {
+        if (!(jsonString.startsWith("{") && jsonString.endsWith("}")) || jsonString.length() < 4) {
             return false;
         }
 
