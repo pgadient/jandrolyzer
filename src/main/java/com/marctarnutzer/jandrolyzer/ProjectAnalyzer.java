@@ -24,6 +24,8 @@ import com.github.javaparser.symbolsolver.utils.SymbolSolverCollectionStrategy;
 import com.github.javaparser.utils.ParserCollectionStrategy;
 import com.github.javaparser.utils.ProjectRoot;
 import com.github.javaparser.utils.SourceRoot;
+import com.marctarnutzer.jandrolyzer.EndpointExtraction.APIURLStrategy;
+import com.marctarnutzer.jandrolyzer.Models.APIURL;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.JSONStringStrategy;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.MoshiGSONStrategy;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.ORGJSONStrategy;
@@ -52,6 +54,7 @@ public class ProjectAnalyzer implements Runnable {
     private Map<String, JSONRoot> jsonModels = new HashMap<>();
     private MoshiGSONStrategy moshiGsonStrategy = new MoshiGSONStrategy();
     private JSONStringStrategy jsonStringStrategy = new JSONStringStrategy();
+    private APIURLStrategy apiurlStrategy = new APIURLStrategy();
 
     public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
                            CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
@@ -273,7 +276,14 @@ public class ProjectAnalyzer implements Runnable {
     }
 
     private void analyzeStringLiteralExpr(Node node, String path) {
-        jsonStringStrategy.parse((StringLiteralExpr) node, path, jsonModels);
+        // Check if StringLiteralExpr is a valid JSON model
+        boolean foundJSONModel = jsonStringStrategy.parse((StringLiteralExpr) node, path, jsonModels);
+        if (foundJSONModel) {
+            return;
+        }
+
+        // Check if StringLiteralExpr is a valid API URL
+        boolean foundAPIURL = apiurlStrategy.extract(((StringLiteralExpr) node).getValue(), this.project);
     }
 
     private void analyzeBinaryExpr(Node node, String path) {
@@ -536,6 +546,11 @@ public class ProjectAnalyzer implements Runnable {
         for (Map.Entry<String, JSONRoot> jsonRootEntry : this.jsonModels.entrySet()) {
             //System.out.println("ID: " + jsonRootEntry.getKey() + "\n" + jsonRootEntry.getValue().toString());
             System.out.println("ID: " + jsonRootEntry.getKey() + "\n" + jsonRootEntry.getValue().formatJSON());
+        }
+
+        System.out.println(project.apiURLs.size() + " detected base API URLs:");
+        for (Map.Entry<String, APIURL> entry : project.apiURLs.entrySet()) {
+            System.out.println(entry.getValue());
         }
 
         JavaParserFacade.clearInstances();

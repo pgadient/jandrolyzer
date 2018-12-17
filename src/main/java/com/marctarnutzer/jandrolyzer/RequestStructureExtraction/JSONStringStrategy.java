@@ -22,7 +22,11 @@ public class JSONStringStrategy {
 
     private JSONDeserializer jsonDeserializer = new JSONDeserializer();
 
-    public void parse(StringLiteralExpr stringLiteralExpr, String path, Map<String, JSONRoot> jsonModels) {
+    /*
+     * Parses a StringLiteralExpr for a valid JSON model
+     * Returns boolean value whether valid JSON model was found or not
+     */
+    public boolean parse(StringLiteralExpr stringLiteralExpr, String path, Map<String, JSONRoot> jsonModels) {
         String toCheck = Utils.removeEscapeSequencesFrom(stringLiteralExpr.getValue());
 
         JSONRoot jsonRoot = jsonDeserializer.deserialize(toCheck, path);
@@ -31,7 +35,11 @@ public class JSONStringStrategy {
             jsonRoot.salt = UUID.randomUUID().toString().replace("-", "");
             jsonRoot.library = "noLib.StringLiteralExpr";
             jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
+        } else {
+            return false;
         }
+
+        return true;
     }
 
     public void parse(BinaryExpr binaryExpr, String path, Map<String, JSONRoot> jsonModels) {

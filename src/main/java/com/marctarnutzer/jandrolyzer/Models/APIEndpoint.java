@@ -8,14 +8,24 @@
 package com.marctarnutzer.jandrolyzer.Models;
 
 import java.util.HashMap;
+import java.util.Map;
 
 public class APIEndpoint {
 
-    String path;
-    public HashMap<String, String> queries;
+    public String path;
+    public HashMap<String, String> queries = new HashMap<>();
 
     public APIEndpoint(String path) {
         this.path = path;
     }
 
+    public String toString() {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("  Path: " + this.path + "\n");
+        stringBuilder.append("  Queries: \n");
+        for (Map.Entry entry: this.queries.entrySet()) {
+            stringBuilder.append("      Query key: " + entry.getKey() + ", query value: " + entry.getValue() + "\n");
+        }
+        return stringBuilder.toString();
+    }
 }
