@@ -42,10 +42,13 @@ public class JSONStringStrategy {
         return true;
     }
 
-    public void parse(BinaryExpr binaryExpr, String path, Map<String, JSONRoot> jsonModels) {
-
+    /*
+     * Parses a top level BinaryExpr for a valid JSON model
+     * Returns boolean value whether valid JSON model was found or not
+     */
+    public boolean parse(BinaryExpr binaryExpr, String path, Map<String, JSONRoot> jsonModels) {
         if (!binaryExpr.getParentNode().isPresent() || binaryExpr.getParentNode().get() instanceof BinaryExpr) {
-            return;
+            return false;
         }
 
         System.out.println("Top level BinaryExpr detected: " + binaryExpr.toString());
@@ -53,7 +56,7 @@ public class JSONStringStrategy {
         String serializedBinaryExpr = serializeBinaryExpr(binaryExpr);
 
         if (serializedBinaryExpr == null) {
-            return;
+            return false;
         }
 
         JSONRoot jsonRoot = jsonDeserializer.deserialize(Utils.removeEscapeSequencesFrom(serializedBinaryExpr), path);
@@ -62,6 +65,10 @@ public class JSONStringStrategy {
             jsonRoot.salt = UUID.randomUUID().toString().replace("-", "");
             jsonRoot.library = "noLib.BinaryExpr";
             jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
+
+            return true;
+        } else {
+            return false;
         }
     }
 

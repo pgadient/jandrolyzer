@@ -130,7 +130,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("Flash.java")) {
+                        if (name.equals("APIURLExtractionTesting.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -287,7 +287,14 @@ public class ProjectAnalyzer implements Runnable {
     }
 
     private void analyzeBinaryExpr(Node node, String path) {
-        jsonStringStrategy.parse((BinaryExpr) node, path, jsonModels);
+        // Check if BinaryExpr is a valid JSON model
+        boolean foundJSONModel = jsonStringStrategy.parse((BinaryExpr) node, path, jsonModels);
+        if (foundJSONModel) {
+            return;
+        }
+
+        //Check if BinaryExpr is a valid API URL
+        boolean foundAPIURL = apiurlStrategy.extract((BinaryExpr) node, this.project);
     }
 
     private void analyzeObjectCreationExpr(Node node, String path, String name) {
