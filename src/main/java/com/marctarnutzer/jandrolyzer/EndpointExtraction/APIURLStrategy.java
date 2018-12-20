@@ -12,11 +12,10 @@ import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.Expression;
-import com.github.javaparser.ast.expr.NameExpr;
-import com.github.javaparser.ast.expr.StringLiteralExpr;
-import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.marctarnutzer.jandrolyzer.Models.APIEndpoint;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
 import com.marctarnutzer.jandrolyzer.Project;
@@ -89,17 +88,18 @@ public class APIURLStrategy {
             toReturn = getExpressionValue(rightExpression.asNameExpr());
         }
 
-        System.out.println("toReturn: " + toReturn);
-
         return toReturn;
     }
 
     private String getExpressionValue(Expression expression) {
+        System.out.println("Getting value of expression: " + expression);
+
         if (expression.isNameExpr()) {
             ResolvedValueDeclaration resolvedValueDeclaration;
             try {
                 resolvedValueDeclaration = expression.asNameExpr().resolve();
             } catch (Exception e) {
+                System.out.println("Error resolving NameExpr: " + e);
                 return null;
             }
 
@@ -123,8 +123,24 @@ public class APIURLStrategy {
                     }
                 }
             } else if (resolvedValueDeclaration.isParameter()) {
-                System.out.println("Its a parameter");
+                Node declarationNode = (((JavaParserParameterDeclaration) resolvedValueDeclaration.asParameter())
+                        .getWrappedNode());
+                System.out.println("Parameter: " + resolvedValueDeclaration.asParameter() + ", Type: "
+                        + resolvedValueDeclaration.asParameter().getType());
+                System.out.println("Declaration node: " + declarationNode);
+            } else if (resolvedValueDeclaration instanceof JavaParserSymbolDeclaration) {
+                System.out.println("Its a JavaParserSymbolDeclaration");
+                Node declarationNode = ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode();
+                if (declarationNode instanceof VariableDeclarator) {
+                    if (((VariableDeclarator) declarationNode).getInitializer().isPresent()) {
+                        return getExpressionValue(((VariableDeclarator) declarationNode).getInitializer().get());
+                    }
+                }
             }
+        } else if (expression.isStringLiteralExpr()) {
+            return expression.asStringLiteralExpr().getValue();
+        } else if (expression.isBinaryExpr()) {
+            return serializeBinaryExpr(expression.asBinaryExpr());
         }
 
         return null;
