@@ -9,9 +9,12 @@ package com.marctarnutzer.jandrolyzer.EndpointExtraction;
 
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.FieldDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
@@ -20,6 +23,9 @@ import com.marctarnutzer.jandrolyzer.Models.APIEndpoint;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
 import com.marctarnutzer.jandrolyzer.Project;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 public class APIURLStrategy {
@@ -53,17 +59,25 @@ public class APIURLStrategy {
             return false;
         }
 
-        String serializedBinaryExpr = serializeBinaryExpr(binaryExpr);
+        System.out.println("Found top level BinaryExpr: " + binaryExpr);
 
-        if (serializedBinaryExpr == null) {
+        List<String> serializedBinaryExprs = serializeBinaryExpr(binaryExpr);
+
+        if (serializedBinaryExprs == null) {
             return false;
         }
 
-        return extract(serializedBinaryExpr, project);
+        boolean foundValidURL = false;
+
+        for (String serializedBinaryExpr : serializedBinaryExprs) {
+            foundValidURL = extract(serializedBinaryExpr, project) || foundValidURL;
+        }
+
+        return foundValidURL;
     }
 
-    private String serializeBinaryExpr(BinaryExpr binaryExpr) {
-        String toReturn = null;
+    private List<String> serializeBinaryExpr(BinaryExpr binaryExpr) {
+        List<String> toReturn = new ArrayList<>();
 
         if (!binaryExpr.getOperator().asString().equals("+")) {
             return null;
@@ -75,23 +89,55 @@ public class APIURLStrategy {
         if (leftExpression.isBinaryExpr()) {
             toReturn = serializeBinaryExpr(leftExpression.asBinaryExpr());
         } else if (leftExpression.isStringLiteralExpr()) {
-            toReturn = leftExpression.asStringLiteralExpr().getValue();
+            toReturn = Arrays.asList(leftExpression.asStringLiteralExpr().getValue());
         } else if (leftExpression.isNameExpr()) {
             toReturn = getExpressionValue(leftExpression.asNameExpr());
         }
 
+        if (toReturn == null) {
+            return null;
+        }
+
         if (rightExpression.isBinaryExpr()) {
-            toReturn = toReturn + serializeBinaryExpr(rightExpression.asBinaryExpr());
+            List<String> appendedPaths = new ArrayList<>();
+            for (String path : toReturn) {
+                List<String> serializedBinaryExprPaths = serializeBinaryExpr(rightExpression.asBinaryExpr());
+                if (serializedBinaryExprPaths == null) {
+                    return null;
+                }
+
+                for (String toAppendPath : serializedBinaryExprPaths) {
+                    appendedPaths.add(path + toAppendPath);
+                }
+            }
+
+            toReturn = appendedPaths;
         } else if (rightExpression.isStringLiteralExpr()) {
-            toReturn = toReturn + rightExpression.asStringLiteralExpr().getValue();
+            List<String> appendedPaths = new ArrayList<>();
+            for (String path : toReturn) {
+                appendedPaths.add(path + rightExpression.asStringLiteralExpr().getValue());
+            }
+            toReturn = appendedPaths;
         } else if (rightExpression.isNameExpr()) {
-            toReturn = getExpressionValue(rightExpression.asNameExpr());
+            List<String> appendedPaths = new ArrayList<>();
+            for (String path: toReturn) {
+                List<String> serializedNameExprPaths = getExpressionValue(rightExpression.asNameExpr());
+                if (serializedNameExprPaths == null) {
+                    return null;
+                }
+
+                for (String toAppendPath : serializedNameExprPaths) {
+                    appendedPaths.add(path + toAppendPath);
+                }
+            }
+
+            toReturn = appendedPaths;
         }
 
         return toReturn;
     }
 
-    private String getExpressionValue(Expression expression) {
+    private List<String> getExpressionValue(Expression expression) {
         System.out.println("Getting value of expression: " + expression);
 
         if (expression.isNameExpr()) {
@@ -104,7 +150,8 @@ public class APIURLStrategy {
             }
 
             if (resolvedValueDeclaration.isVariable()) {
-                System.out.println("Its a variable");
+                // TODO: Check if I even need this...
+                System.out.println("Found a variable");
             } else if (resolvedValueDeclaration.isField()) {
                 if (resolvedValueDeclaration.asField().getType().isReferenceType()) {
                     if (resolvedValueDeclaration.asField().getType().asReferenceType().getQualifiedName()
@@ -116,7 +163,7 @@ public class APIURLStrategy {
                                     .asFieldDeclaration().getVariables().get(0);
                             if (variableDeclarator.getInitializer().isPresent()) {
                                 if (variableDeclarator.getInitializer().get().isStringLiteralExpr()) {
-                                    return variableDeclarator.getInitializer().get().asStringLiteralExpr().getValue();
+                                    return Arrays.asList(variableDeclarator.getInitializer().get().asStringLiteralExpr().getValue());
                                 }
                             }
                         }
@@ -125,11 +172,75 @@ public class APIURLStrategy {
             } else if (resolvedValueDeclaration.isParameter()) {
                 Node declarationNode = (((JavaParserParameterDeclaration) resolvedValueDeclaration.asParameter())
                         .getWrappedNode());
-                System.out.println("Parameter: " + resolvedValueDeclaration.asParameter() + ", Type: "
+                System.out.println("Declaration node: " + declarationNode + ", parameter type: "
                         + resolvedValueDeclaration.asParameter().getType());
-                System.out.println("Declaration node: " + declarationNode);
+
+                if (!((JavaParserParameterDeclaration) resolvedValueDeclaration.asParameter()).getWrappedNode().getParentNode().isPresent()) {
+                   return null;
+                }
+
+                Node parentNode = ((JavaParserParameterDeclaration) resolvedValueDeclaration.asParameter()).getWrappedNode().getParentNode().get();
+                System.out.println("Parent node: " + parentNode);
+
+                if (!(parentNode instanceof MethodDeclaration)) {
+                    return null;
+                }
+
+                MethodDeclaration methodDeclaration = (MethodDeclaration) parentNode;
+
+                if (!methodDeclaration.findCompilationUnit().isPresent()) {
+                    return null;
+                }
+
+                List<MethodCallExpr> methodCallExprs = methodDeclaration.findCompilationUnit().get().findAll(MethodCallExpr.class);
+                List<String> toReturn = new ArrayList<>();
+                for (MethodCallExpr methodCallExpr : methodCallExprs) {
+                    if (methodCallExpr.getName().asString().equals(methodDeclaration.getNameAsString())) {
+                        System.out.println("Found matching method call in compilation unit: " + methodCallExpr);
+
+                        String methodCallExprQSignature;
+                        String methodDeclarationQSignature;
+                        int parameterPosition = 0;
+                        try {
+                            methodCallExprQSignature = methodCallExpr.resolve().getQualifiedSignature();
+                            ResolvedMethodDeclaration resolvedMethodDeclaration = methodDeclaration.resolve();
+                            methodDeclarationQSignature = resolvedMethodDeclaration.getQualifiedSignature();
+
+                            for (int i = 0; i < resolvedMethodDeclaration.getNumberOfParams(); i++) {
+                                if (resolvedMethodDeclaration.getParam(i).hasName() && resolvedMethodDeclaration
+                                        .getParam(i).getName().equals(resolvedValueDeclaration.getName())) {
+                                    parameterPosition = i;
+                                    break;
+                                }
+                            }
+                        } catch (Exception e) {
+                            System.out.println("Signatures could not be determined: " + e);
+                            return null;
+                        }
+
+                        if (methodCallExprQSignature.equals(methodDeclarationQSignature)) {
+                            System.out.println("Signatures match: " + methodCallExprQSignature
+                                    + "parameter position: " + parameterPosition);
+                            List<String> expressionValues = getExpressionValue(methodCallExpr.getArgument(parameterPosition));
+                            if (expressionValues != null) {
+                                toReturn.addAll(expressionValues);
+                            }
+                        } else {
+                            System.out.println("Signatures don't match: " + methodCallExpr.resolve().getQualifiedSignature() + ", and: " + methodDeclaration.resolve().getQualifiedSignature());
+                        }
+                    }
+                }
+
+                if (toReturn.size() == 0) {
+                    System.out.println("Method " + methodDeclaration.getNameAsString() +
+                            " is either not used or called from another class.");
+                    // TODO: Deal with this...
+                    return null;
+                }
+
+                return toReturn;
             } else if (resolvedValueDeclaration instanceof JavaParserSymbolDeclaration) {
-                System.out.println("Its a JavaParserSymbolDeclaration");
+                System.out.println("Found JavaParserSymbolDeclaration");
                 Node declarationNode = ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode();
                 if (declarationNode instanceof VariableDeclarator) {
                     if (((VariableDeclarator) declarationNode).getInitializer().isPresent()) {
@@ -138,7 +249,7 @@ public class APIURLStrategy {
                 }
             }
         } else if (expression.isStringLiteralExpr()) {
-            return expression.asStringLiteralExpr().getValue();
+            return Arrays.asList(expression.asStringLiteralExpr().getValue());
         } else if (expression.isBinaryExpr()) {
             return serializeBinaryExpr(expression.asBinaryExpr());
         }
