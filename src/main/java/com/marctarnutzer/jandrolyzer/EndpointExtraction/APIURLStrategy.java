@@ -8,6 +8,7 @@
 package com.marctarnutzer.jandrolyzer.EndpointExtraction;
 
 import com.github.javaparser.ast.Node;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
@@ -16,17 +17,13 @@ import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
-import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
-import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
-import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.*;
 import com.marctarnutzer.jandrolyzer.Models.APIEndpoint;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
 import com.marctarnutzer.jandrolyzer.Project;
+import com.marctarnutzer.jandrolyzer.Utils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class APIURLStrategy {
 
@@ -74,6 +71,120 @@ public class APIURLStrategy {
         }
 
         return foundValidURL;
+    }
+
+    // Check if a new StringBuilder object is created and check if it contains API endpoint information
+    public boolean extract(VariableDeclarator variableDeclarator, Project project) {
+        if (variableDeclarator.getInitializer().isPresent() && variableDeclarator.getInitializer().get()
+                .isObjectCreationExpr()) {
+            if (variableDeclarator.getInitializer().get().asObjectCreationExpr().getType().getName().asString()
+                    .equals("StringBuilder")) {
+                return extractStringBuilderValue(variableDeclarator, project);
+            }
+        }
+
+        return false;
+    }
+
+    private boolean extractStringBuilderValue(VariableDeclarator variableDeclarator, Project project) {
+        Node containingNode = Utils.getParentClassOrMethod(variableDeclarator);
+
+        List<String> potentialApiURLs = new LinkedList<>();
+        if (containingNode instanceof MethodDeclaration) {
+            List<MethodCallExpr> methodCallExprs = containingNode.findAll(MethodCallExpr.class);
+            Stack<List<String>> chainedValuesStack = new Stack<>();
+            for (MethodCallExpr methodCallExpr : methodCallExprs) {
+                if (!methodCallExpr.getName().asString().equals("append")) {
+                    continue;
+                }
+
+                if (!methodCallExpr.getScope().isPresent()) {
+                    continue;
+                }
+
+                Expression scope = methodCallExpr.getScope().get();
+
+                if (!scope.isNameExpr()) {
+                    while (scope.isMethodCallExpr()) {
+                        if (!(((MethodCallExpr) scope).getScope()).isPresent()) {
+                            break;
+                        }
+                        scope = ((MethodCallExpr) scope).getScope().get();
+                    }
+
+                    if (!scope.isNameExpr()) {
+                        continue;
+                    }
+                }
+
+                ResolvedValueDeclaration resolvedValueDeclaration = scope.asNameExpr()
+                        .resolve();
+                if (resolvedValueDeclaration == null) {
+                    continue;
+                }
+
+                if (resolvedValueDeclaration instanceof JavaParserSymbolDeclaration) {
+                    if (((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
+                            .equals(variableDeclarator)) {
+                        if (((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
+                                instanceof VariableDeclarator) {
+                            System.out.println("Found valid append() MethodCallExpr for: "
+                                    + variableDeclarator.getName().asString() + ", found: "
+                                    + ((VariableDeclarator)((JavaParserSymbolDeclaration) resolvedValueDeclaration)
+                                    .getWrappedNode()).getName().asString());
+
+                            // Get value of append() MethodCallExpr argument
+                            if (methodCallExpr.getArguments().size() != 1) {
+                                continue;
+                            }
+
+                            List<String> appendValues = getExpressionValue(methodCallExpr.getArguments().get(0));
+                            if (appendValues.isEmpty()) {
+                                continue;
+                            }
+
+                            System.out.println("Adding values: " + appendValues.size());
+
+                            if (methodCallExpr.getScope().get().isNameExpr()) {
+                                List<String> appendValuesToCheck = new LinkedList<>();
+                                for (String appendValue : appendValues) {
+                                    if (potentialApiURLs.isEmpty()) {
+                                        appendValuesToCheck.add(appendValue);
+                                    } else {
+                                        for (String preValue : potentialApiURLs) {
+                                            appendValuesToCheck.add(preValue + appendValue);
+                                        }
+                                    }
+                                }
+
+                                List<String> appendValuesToCheckStackIncl = new LinkedList<>();
+                                while (!chainedValuesStack.isEmpty()) {
+                                    for (String appendValue : chainedValuesStack.pop()) {
+                                        for (String preValue : appendValuesToCheck) {
+                                            appendValuesToCheckStackIncl.add(preValue + appendValue);
+                                        }
+                                    }
+                                }
+
+                                if (!appendValuesToCheckStackIncl.isEmpty()) {
+                                    appendValuesToCheck = appendValuesToCheckStackIncl;
+                                }
+
+                                potentialApiURLs = appendValuesToCheck;
+                            } else {
+                                chainedValuesStack.push(appendValues);
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (containingNode instanceof ClassOrInterfaceDeclaration) {
+            // TODO
+        }
+
+        System.out.println("StringBuilder values: " + potentialApiURLs);
+
+        return false;
     }
 
     private List<String> serializeBinaryExpr(BinaryExpr binaryExpr) {

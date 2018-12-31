@@ -13,6 +13,7 @@ import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.printer.DotPrinter;
 import com.github.javaparser.resolution.UnsolvedSymbolException;
@@ -268,11 +269,18 @@ public class ProjectAnalyzer implements Runnable {
             analyzeStringLiteralExpr(node, path);
         } else if (node instanceof BinaryExpr) {
             analyzeBinaryExpr(node, path);
+        } else if (node instanceof VariableDeclarator) {
+            analyzeVariableDeclarator(node);
         }
 
         for (Node child : node.getChildNodes()) {
             analyzeNodeSS(child, path, name);
         }
+    }
+
+    private void analyzeVariableDeclarator(Node node) {
+        // Check if a new StringBuilder object is created and check if it contains API endpoint information
+        boolean foundAPIURL = apiurlStrategy.extract((VariableDeclarator) node, this.project);
     }
 
     private void analyzeStringLiteralExpr(Node node, String path) {
