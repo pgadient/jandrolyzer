@@ -8,10 +8,7 @@
 package com.marctarnutzer.jandrolyzer.EndpointExtraction;
 
 import com.github.javaparser.ast.Node;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.body.FieldDeclaration;
-import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.body.VariableDeclarator;
+import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MethodCallExpr;
@@ -92,99 +89,123 @@ public class APIURLStrategy {
         List<String> potentialApiURLs = new LinkedList<>();
         if (containingNode instanceof MethodDeclaration) {
             List<MethodCallExpr> methodCallExprs = containingNode.findAll(MethodCallExpr.class);
-            Stack<List<String>> chainedValuesStack = new Stack<>();
-            for (MethodCallExpr methodCallExpr : methodCallExprs) {
-                if (!methodCallExpr.getName().asString().equals("append")) {
-                    continue;
-                }
+            potentialApiURLs = reconstructStringBuilderStringsIn(methodCallExprs, variableDeclarator);
+        } else if (containingNode instanceof ClassOrInterfaceDeclaration) {
+            if (variableDeclarator.getParentNode().isPresent() && variableDeclarator.getParentNode().get()
+                    instanceof FieldDeclaration) {
+                Node fieldNode = variableDeclarator.getParentNode().get();
 
-                if (!methodCallExpr.getScope().isPresent()) {
-                    continue;
-                }
-
-                Expression scope = methodCallExpr.getScope().get();
-
-                if (!scope.isNameExpr()) {
-                    while (scope.isMethodCallExpr()) {
-                        if (!(((MethodCallExpr) scope).getScope()).isPresent()) {
-                            break;
-                        }
-                        scope = ((MethodCallExpr) scope).getScope().get();
-                    }
-
-                    if (!scope.isNameExpr()) {
-                        continue;
-                    }
-                }
-
-                ResolvedValueDeclaration resolvedValueDeclaration = scope.asNameExpr()
-                        .resolve();
-                if (resolvedValueDeclaration == null) {
-                    continue;
-                }
-
-                if (resolvedValueDeclaration instanceof JavaParserSymbolDeclaration) {
-                    if (((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
-                            .equals(variableDeclarator)) {
-                        if (((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
-                                instanceof VariableDeclarator) {
-                            System.out.println("Found valid append() MethodCallExpr for: "
-                                    + variableDeclarator.getName().asString() + ", found: "
-                                    + ((VariableDeclarator)((JavaParserSymbolDeclaration) resolvedValueDeclaration)
-                                    .getWrappedNode()).getName().asString());
-
-                            // Get value of append() MethodCallExpr argument
-                            if (methodCallExpr.getArguments().size() != 1) {
-                                continue;
-                            }
-
-                            List<String> appendValues = getExpressionValue(methodCallExpr.getArguments().get(0));
-                            if (appendValues.isEmpty()) {
-                                continue;
-                            }
-
-                            System.out.println("Adding values: " + appendValues.size());
-
-                            if (methodCallExpr.getScope().get().isNameExpr()) {
-                                List<String> appendValuesToCheck = new LinkedList<>();
-                                for (String appendValue : appendValues) {
-                                    if (potentialApiURLs.isEmpty()) {
-                                        appendValuesToCheck.add(appendValue);
-                                    } else {
-                                        for (String preValue : potentialApiURLs) {
-                                            appendValuesToCheck.add(preValue + appendValue);
-                                        }
-                                    }
-                                }
-
-                                List<String> appendValuesToCheckStackIncl = new LinkedList<>();
-                                while (!chainedValuesStack.isEmpty()) {
-                                    for (String appendValue : chainedValuesStack.pop()) {
-                                        for (String preValue : appendValuesToCheck) {
-                                            appendValuesToCheckStackIncl.add(preValue + appendValue);
-                                        }
-                                    }
-                                }
-
-                                if (!appendValuesToCheckStackIncl.isEmpty()) {
-                                    appendValuesToCheck = appendValuesToCheckStackIncl;
-                                }
-
-                                potentialApiURLs = appendValuesToCheck;
-                            } else {
-                                chainedValuesStack.push(appendValues);
-                            }
-                        }
-                    }
+                List<MethodDeclaration> methodDeclarations = containingNode.findAll(MethodDeclaration.class);
+                for (MethodDeclaration methodDeclaration : methodDeclarations) {
+                    List<MethodCallExpr> methodCallExprs = methodDeclaration.findAll(MethodCallExpr.class);
+                    potentialApiURLs.addAll(reconstructStringBuilderStringsIn(methodCallExprs, fieldNode));
                 }
             }
-        } else if (containingNode instanceof ClassOrInterfaceDeclaration) {
-            // TODO
         }
 
-        System.out.println("StringBuilder values: " + potentialApiURLs);
+        /*
+         * Check if the assembled StringBuilder strings contain valid API URLs
+         */
+        boolean foundAPIURL = false;
+        for (String potentialAPIURL : potentialApiURLs) {
+            foundAPIURL = extract(potentialAPIURL, project) || foundAPIURL;
+        }
 
-        return false;
+        return foundAPIURL;
+    }
+
+    private List<String> reconstructStringBuilderStringsIn(List<MethodCallExpr> methodCallExprs,
+                                                            Node variableOrFieldNode) {
+        List<String> potentialApiURLs = new LinkedList<>();
+        Stack<List<String>> chainedValuesStack = new Stack<>();
+        for (MethodCallExpr methodCallExpr : methodCallExprs) {
+            if (!methodCallExpr.getName().asString().equals("append")) {
+                continue;
+            }
+
+            if (!methodCallExpr.getScope().isPresent()) {
+                continue;
+            }
+
+            System.out.println("Checking: " + methodCallExpr);
+
+            Expression scope = methodCallExpr.getScope().get();
+
+            if (!(scope.isNameExpr() || scope.isFieldAccessExpr())) {
+                while (scope.isMethodCallExpr()) {
+                    if (!(((MethodCallExpr) scope).getScope()).isPresent()) {
+                        break;
+                    }
+                    scope = ((MethodCallExpr) scope).getScope().get();
+                }
+
+                if (!scope.isNameExpr() || !scope.isFieldAccessExpr()) {
+                    continue;
+                }
+            }
+
+            ResolvedValueDeclaration resolvedValueDeclaration = null;
+            if (scope.isNameExpr()) {
+                resolvedValueDeclaration = scope.asNameExpr().resolve();
+            } else if (scope.isFieldAccessExpr()) {
+                resolvedValueDeclaration = scope.asFieldAccessExpr().resolve();
+            }
+
+            if (resolvedValueDeclaration == null) {
+                continue;
+            }
+
+            if (((resolvedValueDeclaration instanceof JavaParserSymbolDeclaration)
+                    && ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
+                    .equals(variableOrFieldNode)) || ((resolvedValueDeclaration instanceof JavaParserFieldDeclaration)
+                    && ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode().equals(variableOrFieldNode))) {
+
+                // Get value of append() MethodCallExpr argument
+                if (methodCallExpr.getArguments().size() != 1) {
+                    continue;
+                }
+
+                List<String> appendValues = getExpressionValue(methodCallExpr.getArguments().get(0));
+                if (appendValues.isEmpty()) {
+                    continue;
+                }
+
+                System.out.println("Adding values: " + appendValues.size());
+
+                if (methodCallExpr.getScope().get().isNameExpr() || methodCallExpr.getScope().get()
+                        .isFieldAccessExpr()) {
+                    List<String> appendValuesToCheck = new LinkedList<>();
+                    for (String appendValue : appendValues) {
+                        if (potentialApiURLs.isEmpty()) {
+                            appendValuesToCheck.add(appendValue);
+                        } else {
+                            for (String preValue : potentialApiURLs) {
+                                appendValuesToCheck.add(preValue + appendValue);
+                            }
+                        }
+                    }
+
+                    List<String> appendValuesToCheckStackIncl = new LinkedList<>();
+                    while (!chainedValuesStack.isEmpty()) {
+                        for (String appendValue : chainedValuesStack.pop()) {
+                            for (String preValue : appendValuesToCheck) {
+                                appendValuesToCheckStackIncl.add(preValue + appendValue);
+                            }
+                        }
+                    }
+
+                    if (!appendValuesToCheckStackIncl.isEmpty()) {
+                        appendValuesToCheck = appendValuesToCheckStackIncl;
+                    }
+
+                    potentialApiURLs = appendValuesToCheck;
+                } else {
+                    chainedValuesStack.push(appendValues);
+                }
+            }
+        }
+
+        return potentialApiURLs;
     }
 
     private List<String> serializeBinaryExpr(BinaryExpr binaryExpr) {
