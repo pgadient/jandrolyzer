@@ -120,6 +120,83 @@ public class APIURLStrategy {
         Stack<List<String>> chainedValuesStack = new Stack<>();
         for (MethodCallExpr methodCallExpr : methodCallExprs) {
             if (!methodCallExpr.getName().asString().equals("append")) {
+                /*
+                 * Check if StringBuilder is passed to another method and append potential String values
+                 */
+                int parameterNbr = 0;
+                for (Expression expression : methodCallExpr.getArguments()) {
+                    ResolvedValueDeclaration resolvedValueDeclaration = null;
+                    if (expression.isFieldAccessExpr()) {
+                        try {
+                            resolvedValueDeclaration = expression.asFieldAccessExpr().resolve();
+                        } catch (Exception e) {
+                            continue;
+                        }
+                    } else if (expression.isNameExpr()) {
+                        try {
+                            resolvedValueDeclaration = expression.asNameExpr().resolve();
+                        } catch (Exception e) {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+
+                    if (resolvedValueDeclaration == null) {
+                        continue;
+                    }
+
+                    if (!(resolvedValueDeclaration.getType().isReferenceType()
+                            && resolvedValueDeclaration.getType().asReferenceType().getQualifiedName()
+                            .equals("java.lang.StringBuilder"))) {
+                        continue;
+                    }
+
+                    if (((resolvedValueDeclaration instanceof JavaParserSymbolDeclaration)
+                            && ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
+                            .equals(variableOrFieldNode)) || ((resolvedValueDeclaration instanceof JavaParserFieldDeclaration)
+                            && ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode().equals(variableOrFieldNode))) {
+                        System.out.println("Found valid StringBuilder parameter in method call: " + methodCallExpr);
+
+                        MethodDeclaration methodDeclaration = null;
+                        try {
+                            ResolvedMethodDeclaration resolvedMethodDeclaration = methodCallExpr.resolve();
+                            methodDeclaration = ((JavaParserMethodDeclaration) resolvedMethodDeclaration).getWrappedNode();
+                        } catch (Exception e) {
+                            continue;
+                        }
+
+                        if (methodDeclaration == null) {
+                            continue;
+                        }
+
+                        List<MethodCallExpr> mMethodCallExpr = methodDeclaration.findAll(MethodCallExpr.class);
+                        List<String> sbValues = reconstructStringBuilderStringsIn(mMethodCallExpr, methodDeclaration.getParameter(parameterNbr));
+
+                        if (sbValues.isEmpty()) {
+                            continue;
+                        }
+
+                        List<String> appendedPotentialAPIURLs = new ArrayList<>();
+                        if (!potentialApiURLs.isEmpty()) {
+                            for (String potentialAPIURL : potentialApiURLs) {
+                                for (String sbValue : sbValues) {
+                                    appendedPotentialAPIURLs.add(potentialAPIURL + sbValue);
+                                }
+                            }
+                        } else {
+                            for (String sbValue : sbValues) {
+                                appendedPotentialAPIURLs.add(sbValue);
+                            }
+                        }
+
+                        potentialApiURLs = appendedPotentialAPIURLs;
+                        continue;
+                    }
+
+                    parameterNbr++;
+                }
+
                 continue;
             }
 
@@ -127,9 +204,9 @@ public class APIURLStrategy {
                 continue;
             }
 
-            System.out.println("Checking: " + methodCallExpr);
-
             Expression scope = methodCallExpr.getScope().get();
+
+            System.out.println("Checking: " + methodCallExpr + ", scope: " + scope);
 
             if (!(scope.isNameExpr() || scope.isFieldAccessExpr())) {
                 while (scope.isMethodCallExpr()) {
@@ -139,7 +216,7 @@ public class APIURLStrategy {
                     scope = ((MethodCallExpr) scope).getScope().get();
                 }
 
-                if (!scope.isNameExpr() || !scope.isFieldAccessExpr()) {
+                if (!(scope.isNameExpr() || scope.isFieldAccessExpr())) {
                     continue;
                 }
             }
@@ -157,8 +234,13 @@ public class APIURLStrategy {
 
             if (((resolvedValueDeclaration instanceof JavaParserSymbolDeclaration)
                     && ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
-                    .equals(variableOrFieldNode)) || ((resolvedValueDeclaration instanceof JavaParserFieldDeclaration)
-                    && ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode().equals(variableOrFieldNode))) {
+                    .equals(variableOrFieldNode))
+                    || ((resolvedValueDeclaration instanceof JavaParserFieldDeclaration)
+                    && ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode()
+                    .equals(variableOrFieldNode))
+                    || (resolvedValueDeclaration instanceof JavaParserParameterDeclaration)
+                    && ((JavaParserParameterDeclaration) resolvedValueDeclaration).getWrappedNode()
+                    .equals(variableOrFieldNode)) {
 
                 // Get value of append() MethodCallExpr argument
                 if (methodCallExpr.getArguments().size() != 1) {
