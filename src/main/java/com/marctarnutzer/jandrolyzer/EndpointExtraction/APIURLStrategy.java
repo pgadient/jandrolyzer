@@ -83,6 +83,62 @@ public class APIURLStrategy {
         return false;
     }
 
+    /*
+     * Extract API URLs from concatenated Strings using the concat() MethodCallExpr
+     */
+    public void extract(MethodCallExpr methodCallExpr, Project project) {
+        if (methodCallExpr.getParentNode().isPresent() && methodCallExpr.getParentNode().get() instanceof MethodCallExpr
+                && ((MethodCallExpr) methodCallExpr.getParentNode().get()).asMethodCallExpr().getName().asString()
+                .equals("concat")) {
+            return;
+        }
+
+        System.out.println("Detected rightmost concat method: " + methodCallExpr);
+
+        List<String> stringsToCheck = extractStringConcatValue(methodCallExpr);
+
+        if (stringsToCheck == null) {
+            return;
+        }
+
+        for (String stringToCheck : stringsToCheck) {
+            extract(stringToCheck, project);
+        }
+    }
+
+    private List<String> extractStringConcatValue(MethodCallExpr methodCallExpr) {
+        if (methodCallExpr.getArguments().size() != 1 || !methodCallExpr.getScope().isPresent()) {
+            return null;
+        }
+
+        Expression scope = methodCallExpr.getScope().get();
+        List<String> toCheck = getExpressionValue(methodCallExpr.getArgument(0));
+
+        if (toCheck == null || !(scope.isMethodCallExpr() || scope.isNameExpr() || scope.isFieldAccessExpr())) {
+            return null;
+        }
+
+        List<String> prePath = null;
+        if (scope.isMethodCallExpr()) {
+            prePath = extractStringConcatValue((MethodCallExpr) scope);
+        } else if (scope.isNameExpr() || scope.isFieldAccessExpr()) {
+            prePath = getExpressionValue(scope);
+        }
+
+        List<String> toReturn = new LinkedList<>();
+        if (prePath != null) {
+            for (String s : toCheck) {
+                for (String p : prePath) {
+                    toReturn.add(p + s);
+                }
+            }
+        } else {
+            return null;
+        }
+
+        return toReturn;
+    }
+
     private boolean extractStringBuilderValue(VariableDeclarator variableDeclarator, Project project) {
         Node containingNode = Utils.getParentClassOrMethod(variableDeclarator);
 

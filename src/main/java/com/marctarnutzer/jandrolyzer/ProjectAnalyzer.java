@@ -439,6 +439,9 @@ public class ProjectAnalyzer implements Runnable {
             case "addProperty": case "toJson": case "adapter":
                 moshiGsonStrategy.extract(node, path, jsonModels, combinedTypeSolver);
                 break;
+            case "concat":
+                apiurlStrategy.extract((MethodCallExpr) node, this.project);
+                break;
         }
     }
 
