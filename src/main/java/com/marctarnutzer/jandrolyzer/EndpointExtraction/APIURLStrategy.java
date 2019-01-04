@@ -419,6 +419,8 @@ public class APIURLStrategy {
                 return null;
             }
 
+            System.out.println("ResolvedValueDec: " + resolvedValueDeclaration);
+
             if (resolvedValueDeclaration.isVariable()) {
                 // TODO: Check if I even need this...
                 System.out.println("Found a variable");
@@ -522,6 +524,10 @@ public class APIURLStrategy {
             return Arrays.asList(expression.asStringLiteralExpr().getValue());
         } else if (expression.isBinaryExpr()) {
             return serializeBinaryExpr(expression.asBinaryExpr());
+        } else if (expression.isMethodCallExpr()) {
+            if (expression.asMethodCallExpr().getName().asString().equals("concat")) {
+                return extractStringConcatValue(expression.asMethodCallExpr());
+            }
         }
 
         return null;
