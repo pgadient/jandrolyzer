@@ -365,6 +365,9 @@ public class ProjectAnalyzer implements Runnable {
                     saveSnippet(path, name, typeString, typeString, node);
                 }
                 break;
+            case "URL":
+                apiurlStrategy.extract((ObjectCreationExpr) node, this.project);
+                break;
             default:
                 //System.out.println("Not identified: " + node.toString());
                 //System.out.println("    type: " + ((ObjectCreationExpr) node).getType().getName().asString());

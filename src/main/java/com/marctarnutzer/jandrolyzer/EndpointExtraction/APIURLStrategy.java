@@ -12,8 +12,10 @@ import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
+import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.*;
 import com.marctarnutzer.jandrolyzer.Models.APIEndpoint;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
@@ -103,6 +105,106 @@ public class APIURLStrategy {
 
         for (String stringToCheck : stringsToCheck) {
             extract(stringToCheck, project);
+        }
+    }
+
+    /*
+     * Extract API URLs from java.net.URL ObjectCreationExpr and save valid URLs in Project object
+     */
+    public void extract(ObjectCreationExpr objectCreationExpr, Project project) {
+        List<String> toCheck = extractURLValue(objectCreationExpr);
+
+        for (String tc : toCheck) {
+            extract(tc, project);
+        }
+    }
+
+    /*
+     * Extract API URLs from java.net.URL ObjectCreationExpr
+     *
+     * Returns list of value Strings or null if an error occurred
+     */
+    private List<String> extractURLValue(ObjectCreationExpr objectCreationExpr) {
+        ResolvedType resolvedType;
+        try {
+            resolvedType = objectCreationExpr.calculateResolvedType();
+        } catch (Exception e) {
+            System.out.println("Error calculating resolved type: " + e);
+            return null;
+        }
+
+        if (!(resolvedType.isReferenceType() && resolvedType.asReferenceType().getQualifiedName().equals("java.net.URL"))) {
+            return null;
+        }
+
+        if (objectCreationExpr.getArguments().isEmpty()) {
+            return null;
+        }
+
+        List<String> toReturn = new LinkedList<>();
+
+        if (objectCreationExpr.getArguments().size() == 1) {
+            toReturn = getExpressionValue(objectCreationExpr.getArgument(0));
+        } else if (objectCreationExpr.getArguments().size() == 2) {
+            List<String> context = getExpressionValue(objectCreationExpr.getArgument(0));
+            List<String> spec = getExpressionValue(objectCreationExpr.getArgument(1));
+
+            if (context == null || context.isEmpty()
+                    || spec == null || spec.isEmpty()) {
+                return null;
+            }
+
+            for (String c : context) {
+                for (String s : spec) {
+                    toReturn.add(c + s);
+                }
+            }
+        } else if (objectCreationExpr.getArguments().size() == 3) {
+            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0));
+            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1));
+            List<String> file = getExpressionValue(objectCreationExpr.getArgument(2));
+
+            if (protocols == null || protocols.isEmpty()
+                    || host == null || host.isEmpty() ||
+                    file == null || file.isEmpty()) {
+                return null;
+            }
+
+            for (String p : protocols) {
+               for (String h : host) {
+                   for (String f : file) {
+                       toReturn.add(p + "://" + h + f);
+                   }
+               }
+            }
+        } else if (objectCreationExpr.getArguments().size() == 4) {
+            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0));
+            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1));
+            List<String> port = getExpressionValue(objectCreationExpr.getArgument(2));
+            List<String> file = getExpressionValue(objectCreationExpr.getArgument(3));
+
+            if (protocols == null || protocols.isEmpty()
+                    || host == null || host.isEmpty()
+                    || file == null || file.isEmpty()
+                    || port == null || port.isEmpty()) {
+                return null;
+            }
+
+            for (String p : protocols) {
+                for (String h : host) {
+                    for (String po : port) {
+                        for (String f : file) {
+                            toReturn.add(p + "://" + h + ":" + po + f);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (toReturn.isEmpty()) {
+            return null;
+        } else {
+            return toReturn;
         }
     }
 
@@ -522,11 +624,25 @@ public class APIURLStrategy {
             }
         } else if (expression.isStringLiteralExpr()) {
             return Arrays.asList(expression.asStringLiteralExpr().getValue());
+        } else if (expression.isIntegerLiteralExpr()) {
+            return Arrays.asList(expression.asIntegerLiteralExpr().getValue());
+        } else if (expression.isBooleanLiteralExpr()) {
+            return Arrays.asList(Boolean.toString(expression.asBooleanLiteralExpr().getValue()));
+        } else if (expression.isDoubleLiteralExpr()) {
+            return Arrays.asList(expression.asDoubleLiteralExpr().getValue());
+        } else if (expression.isLongLiteralExpr()) {
+            return Arrays.asList(expression.asLongLiteralExpr().getValue());
+        } else if (expression.isNullLiteralExpr()) {
+            return Arrays.asList("null");
         } else if (expression.isBinaryExpr()) {
             return serializeBinaryExpr(expression.asBinaryExpr());
         } else if (expression.isMethodCallExpr()) {
             if (expression.asMethodCallExpr().getName().asString().equals("concat")) {
                 return extractStringConcatValue(expression.asMethodCallExpr());
+            }
+        } else if (expression.isObjectCreationExpr()) {
+            if (expression.asObjectCreationExpr().getType().getName().asString().equals("URL")) {
+                return extractURLValue(expression.asObjectCreationExpr());
             }
         }
 
