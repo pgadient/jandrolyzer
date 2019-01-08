@@ -265,7 +265,16 @@ public class APIURLStrategy {
                     instanceof FieldDeclaration) {
                 Node fieldNode = variableDeclarator.getParentNode().get();
 
-                List<MethodDeclaration> methodDeclarations = containingNode.findAll(MethodDeclaration.class);
+                List<MethodDeclaration> methodDeclarations = new LinkedList<>();
+                if (((FieldDeclaration) fieldNode).isPublic()) {
+                    for (CompilationUnit cu : this.project.compilationUnits) {
+                        methodDeclarations.addAll(cu.findAll(MethodDeclaration.class));
+                    }
+                } else {
+                    methodDeclarations = containingNode.findAll(MethodDeclaration.class);
+                }
+
+                //List<MethodDeclaration> methodDeclarations = containingNode.findAll(MethodDeclaration.class);
                 for (MethodDeclaration methodDeclaration : methodDeclarations) {
                     List<MethodCallExpr> methodCallExprs = methodDeclaration.findAll(MethodCallExpr.class);
                     potentialApiURLs.addAll(reconstructStringBuilderStringsIn(methodCallExprs, fieldNode));
