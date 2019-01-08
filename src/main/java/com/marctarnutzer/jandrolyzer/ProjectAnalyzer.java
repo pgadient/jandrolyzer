@@ -55,7 +55,7 @@ public class ProjectAnalyzer implements Runnable {
     private Map<String, JSONRoot> jsonModels = new HashMap<>();
     private MoshiGSONStrategy moshiGsonStrategy = new MoshiGSONStrategy();
     private JSONStringStrategy jsonStringStrategy = new JSONStringStrategy();
-    private APIURLStrategy apiurlStrategy = new APIURLStrategy();
+    private APIURLStrategy apiurlStrategy;
 
     public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
                            CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
@@ -71,6 +71,7 @@ public class ProjectAnalyzer implements Runnable {
             throw new FileNotFoundException("Specified project directory does not exist or is not a directory");
         }
         this.project = new Project(this.projectFolder.getPath(), this.projectFolder.getName());
+        this.apiurlStrategy = new APIURLStrategy(project);
     }
 
     public void analyze() {
@@ -108,6 +109,16 @@ public class ProjectAnalyzer implements Runnable {
             projectRoot = new ParserCollectionStrategy().collect(projectFolder.toPath());
         }
 
+        for (SourceRoot sourceRoot : projectRoot.getSourceRoots()) {
+            try {
+                sourceRoot.tryToParse();
+                this.project.compilationUnits.addAll(sourceRoot.getCompilationUnits());
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+        }
+
         List<CompilationUnit> compilationUnits = null;
         for (SourceRoot sourceRoot : projectRoot.getSourceRoots()) {
             try {
@@ -131,7 +142,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("APIURLExtractionTesting.java")) {
+                        if (name.equals("BaseURLs.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {

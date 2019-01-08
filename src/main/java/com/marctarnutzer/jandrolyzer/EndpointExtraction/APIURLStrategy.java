@@ -7,12 +7,14 @@
 
 package com.marctarnutzer.jandrolyzer.EndpointExtraction;
 
+import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
+import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.resolution.types.ResolvedType;
@@ -25,6 +27,12 @@ import com.marctarnutzer.jandrolyzer.Utils;
 import java.util.*;
 
 public class APIURLStrategy {
+
+    Project project;
+
+    public APIURLStrategy(Project project) {
+        this.project = project;
+    }
 
     public boolean extract(String potentialURL, Project project) {
         String urlScheme = getScheme(potentialURL);
@@ -113,6 +121,10 @@ public class APIURLStrategy {
      */
     public void extract(ObjectCreationExpr objectCreationExpr, Project project) {
         List<String> toCheck = extractURLValue(objectCreationExpr);
+
+        if (toCheck == null) {
+            return;
+        }
 
         for (String tc : toCheck) {
             extract(tc, project);
@@ -464,6 +476,8 @@ public class APIURLStrategy {
             toReturn = Arrays.asList(leftExpression.asStringLiteralExpr().getValue());
         } else if (leftExpression.isNameExpr()) {
             toReturn = getExpressionValue(leftExpression.asNameExpr());
+        } else {
+            toReturn = getExpressionValue(leftExpression);
         }
 
         if (toReturn == null) {
@@ -504,6 +518,20 @@ public class APIURLStrategy {
             }
 
             toReturn = appendedPaths;
+        } else {
+            List<String> appendPaths = new ArrayList<>();
+            for (String path : toReturn) {
+                List<String> toAdd = getExpressionValue(rightExpression);
+                if (toAdd == null) {
+                    return null;
+                }
+
+                for (String toAppendPath : toAdd) {
+                    appendPaths.add(path + toAppendPath);
+                }
+            }
+
+            toReturn = appendPaths;
         }
 
         return toReturn;
@@ -566,7 +594,16 @@ public class APIURLStrategy {
                     return null;
                 }
 
-                List<MethodCallExpr> methodCallExprs = methodDeclaration.findCompilationUnit().get().findAll(MethodCallExpr.class);
+                List<MethodCallExpr> methodCallExprs = new LinkedList<>();
+
+                if (methodDeclaration.isPublic()) {
+                    for (CompilationUnit cu : project.compilationUnits) {
+                        methodCallExprs.addAll(cu.findAll(MethodCallExpr.class));
+                    }
+                } else {
+                    methodCallExprs = methodDeclaration.findCompilationUnit().get().findAll(MethodCallExpr.class);
+                }
+
                 List<String> toReturn = new ArrayList<>();
                 for (MethodCallExpr methodCallExpr : methodCallExprs) {
                     if (methodCallExpr.getName().asString().equals(methodDeclaration.getNameAsString())) {
@@ -639,11 +676,82 @@ public class APIURLStrategy {
         } else if (expression.isMethodCallExpr()) {
             if (expression.asMethodCallExpr().getName().asString().equals("concat")) {
                 return extractStringConcatValue(expression.asMethodCallExpr());
+            } else {
+                ResolvedMethodDeclaration resolvedMethodDeclaration = null;
+                try {
+                    resolvedMethodDeclaration = expression.asMethodCallExpr().resolve();
+                } catch (Exception e) {
+                    System.out.println("Error resolving MethodCallExpr: " + e);
+                }
+
+                System.out.println("Resolved MethodCallExpr: " + resolvedMethodDeclaration);
+
+                if (resolvedMethodDeclaration == null) {
+                    return null;
+                }
+
+                MethodDeclaration methodDeclaration = ((JavaParserMethodDeclaration) resolvedMethodDeclaration)
+                        .getWrappedNode();
+
+                List<ReturnStmt> returnStmts = methodDeclaration.findAll(ReturnStmt.class);
+                List<String> toReturn = new LinkedList<>();
+                for (ReturnStmt returnStmt : returnStmts) {
+                    System.out.println("Found return statement: " + returnStmt);
+
+                    List<String> returnExprResult = getExpressionValue(returnStmt.getExpression().get());
+
+                    if (returnExprResult == null) {
+                        continue;
+                    }
+
+                    toReturn.addAll(returnExprResult);
+                }
+
+                if (toReturn == null || toReturn.isEmpty()) {
+                    return null;
+                }
+
+                return toReturn;
             }
         } else if (expression.isObjectCreationExpr()) {
             if (expression.asObjectCreationExpr().getType().getName().asString().equals("URL")) {
                 return extractURLValue(expression.asObjectCreationExpr());
             }
+        } else if (expression.isFieldAccessExpr()) {
+            System.out.println("Field expression found: " + expression);
+
+            ResolvedValueDeclaration resolvedValueDeclaration;
+            try {
+                resolvedValueDeclaration = expression.asFieldAccessExpr().resolve();
+            } catch (Exception e) {
+                System.out.println("Error resolving field access expression: " + e);
+                return null;
+            }
+
+            if (resolvedValueDeclaration instanceof JavaParserFieldDeclaration) {
+                Node declarationNode = ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode();
+
+                if (declarationNode instanceof FieldDeclaration) {
+                    VariableDeclarator variableDeclarator = null;
+                    for (VariableDeclarator vd : ((FieldDeclaration) declarationNode).getVariables()) {
+                        if (vd.getName().asString().equals(expression.asFieldAccessExpr().getName().asString())) {
+                            variableDeclarator = vd;
+                        }
+                    }
+
+                    if (variableDeclarator == null) {
+                        return null;
+                    }
+
+                    if (variableDeclarator.getInitializer().isPresent()) {
+                        return getExpressionValue(variableDeclarator.getInitializer().get());
+                    }
+                }
+            } else {
+                System.out.println("Not a JavaParserFieldDeclaration: " + resolvedValueDeclaration);
+            }
+        } else {
+            System.out.println("NOT IMPLEMENTED: " + expression);
         }
 
         return null;

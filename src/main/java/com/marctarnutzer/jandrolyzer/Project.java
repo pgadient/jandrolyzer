@@ -7,6 +7,7 @@
 
 package com.marctarnutzer.jandrolyzer;
 
+import com.github.javaparser.ast.CompilationUnit;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
 
 import java.util.*;
@@ -19,6 +20,7 @@ public class Project {
     public Map<String, JSONRoot> jsonModels = new HashMap<>();
     public Set<String> jsonLibraries = new HashSet<>();
     public Map<String, APIURL> apiURLs = new HashMap<>();
+    public List<CompilationUnit> compilationUnits = new LinkedList<>();
 
     public Project(String path, String name) {
         this.path = path;
