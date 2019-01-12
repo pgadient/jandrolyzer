@@ -26,6 +26,7 @@ import com.github.javaparser.utils.ParserCollectionStrategy;
 import com.github.javaparser.utils.ProjectRoot;
 import com.github.javaparser.utils.SourceRoot;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.APIURLStrategy;
+import com.marctarnutzer.jandrolyzer.EndpointExtraction.OkHttpStrategy;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.JSONStringStrategy;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.MoshiGSONStrategy;
@@ -56,6 +57,7 @@ public class ProjectAnalyzer implements Runnable {
     private MoshiGSONStrategy moshiGsonStrategy = new MoshiGSONStrategy();
     private JSONStringStrategy jsonStringStrategy = new JSONStringStrategy();
     private APIURLStrategy apiurlStrategy;
+    private OkHttpStrategy okHttpStrategy;
 
     public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
                            CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
@@ -72,6 +74,7 @@ public class ProjectAnalyzer implements Runnable {
         }
         this.project = new Project(this.projectFolder.getPath(), this.projectFolder.getName());
         this.apiurlStrategy = new APIURLStrategy(project);
+        this.okHttpStrategy = new OkHttpStrategy(project);
     }
 
     public void analyze() {
@@ -142,7 +145,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("BaseURLs.java")) {
+                        if (name.equals("OkHttpTesting.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -292,6 +295,13 @@ public class ProjectAnalyzer implements Runnable {
     private void analyzeVariableDeclarator(Node node) {
         // Check if a new StringBuilder object is created and check if it contains API endpoint information
         boolean foundAPIURL = apiurlStrategy.extract((VariableDeclarator) node, this.project);
+
+        if (foundAPIURL) {
+            return;
+        }
+
+        // Check if a HttpUrl.Builder object is created and check if it contains API endpoint information
+        foundAPIURL = okHttpStrategy.extract((VariableDeclarator) node);
     }
 
     private void analyzeStringLiteralExpr(Node node, String path) {
@@ -455,6 +465,9 @@ public class ProjectAnalyzer implements Runnable {
                 break;
             case "concat":
                 apiurlStrategy.extract((MethodCallExpr) node, this.project);
+                break;
+            case "build":
+                okHttpStrategy.extract((MethodCallExpr) node);
                 break;
         }
     }
