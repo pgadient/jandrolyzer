@@ -22,7 +22,9 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.marctarnutzer.jandrolyzer.Project;
 import com.marctarnutzer.jandrolyzer.TypeEstimator;
 import com.marctarnutzer.jandrolyzer.Utils;
+import okhttp3.HttpUrl;
 
+import java.net.URLEncoder;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -357,7 +359,7 @@ public class OkHttpStrategy {
 
                     break;
                 case "scheme": case "host": case "port": case "addPathSegment": case "addPathSegments":
-                case "addEncodedPathSegment": case "fragment": case "encodedFragment":
+                case "addEncodedPathSegment": case "addEncodedPathSegments": case "fragment": case "encodedFragment":
                     if (methodCallExpr.getArguments().size() != 1) {
                         return null;
                     }
@@ -376,14 +378,18 @@ public class OkHttpStrategy {
                             expressionValues.add(":" + argValue);
                         }
                     } else if (methodCallExpr.getName().asString().equals("addPathSegment")) {
-                        // TODO: encode String with OkHttp before adding to toReturn
                         for (String argValue : argValues) {
-                            expressionValues.add("/" + argValue);
+                            HttpUrl httpUrl = new HttpUrl.Builder().scheme("http").host("somehost.com")
+                                    .addPathSegment(argValue).build();
+                            argValue = httpUrl.encodedPath();
+                            expressionValues.add(argValue);
                         }
                     } else if (methodCallExpr.getName().asString().equals("addPathSegments")) {
-                        // TODO: encode String with OkHttp before adding to toReturn
                         for (String argValue : argValues) {
-                            expressionValues.add("/" + argValue);
+                            HttpUrl httpUrl = new HttpUrl.Builder().scheme("http").host("somehost.com")
+                                    .addPathSegments(argValue).build();
+                            argValue = httpUrl.encodedPath();
+                            expressionValues.add(argValue);
                         }
                     } else if (methodCallExpr.getName().asString().equals("addEncodedPathSegment")
                             || methodCallExpr.getName().asString().equals("addEncodedPathSegments")) {
@@ -391,8 +397,12 @@ public class OkHttpStrategy {
                             expressionValues.add("/" + argValue);
                         }
                     } else if (methodCallExpr.getName().asString().equals("fragment")) {
-                        // TODO: encode String with OkHttp before adding to toReturn if encoded fragment
                         for (String argValue : argValues) {
+                            try {
+                                argValue = URLEncoder.encode(argValue, "utf-8");
+                            } catch (Exception e) {
+                                System.out.println("URLEncoder error: " + e);
+                            }
                             expressionValues.add("#" + argValue);
                         }
                     } else if (methodCallExpr.getName().asString().equals("encodedFragment")) {
@@ -421,8 +431,6 @@ public class OkHttpStrategy {
             } else {
                 return toReturn;
             }
-        } else if (expression.isNameExpr()) {
-            // Found variable containing instance of Builder, need to search declaration and reconstruct value
         }
 
 
