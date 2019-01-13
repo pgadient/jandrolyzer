@@ -159,18 +159,38 @@ public class APIURLStrategy {
         }
     }
 
-    private void extractQuery(String queryString, APIEndpoint apiEndpoint) {
-        String[] queryPairs = queryString.split("&");
+    private void extractFragment(String fragmentString, APIEndpoint apiEndpoint) {
+        String[] fragments = fragmentString.split("#");
 
-        if (queryPairs.length == 0) {
-            return;
+        for (String fragment : fragments) {
+            apiEndpoint.fragments.add(fragment);
         }
+    }
 
-        for (String keyValuePairString : queryPairs) {
-            String[] keyValuePair = keyValuePairString.split("=");
-            if (keyValuePair.length == 2) {
-                apiEndpoint.queries.put(keyValuePair[0], keyValuePair[1]);
+    private void extractQuery(String queryString, APIEndpoint apiEndpoint) {
+        if (queryString.startsWith("?")) {
+            queryString = queryString.replaceFirst("\\?", "");
+
+            String[] qf = queryString.split("#");
+
+            String[] queryPairs = qf[0].split("&");
+
+            if (queryPairs.length == 0 || qf.length == 0) {
+                return;
             }
+
+            for (String keyValuePairString : queryPairs) {
+                String[] keyValuePair = keyValuePairString.split("=");
+                if (keyValuePair.length == 2) {
+                    apiEndpoint.queries.put(keyValuePair[0], keyValuePair[1]);
+                }
+            }
+
+            if (qf.length > 1) {
+                extractFragment(queryString.replaceFirst(qf[0] + "#", ""), apiEndpoint);
+            }
+        } else if (queryString.startsWith("#")) {
+            extractFragment(queryString.replaceFirst("#", ""), apiEndpoint);
         }
     }
 
@@ -178,7 +198,7 @@ public class APIURLStrategy {
      * Extracts the endpoint path & query key value pairs and assigns their values to the APIURL object
      */
     private void extractEndpoint(String endpointString, APIURL apiurl) {
-        String[] urlParts = endpointString.split("\\?");
+        String[] urlParts = endpointString.split("(\\?|#)");
 
         if (urlParts.length == 0) {
             return;
@@ -189,13 +209,13 @@ public class APIURLStrategy {
             endpointPath = endpointPath.substring(0, endpointPath.length() - 1);
         }
 
-        String toReturn = endpointString.replaceFirst(urlParts[0], "");
-        toReturn = toReturn.replaceFirst("\\?", "");
+        String possibleQueryOrFragment = endpointString.replaceFirst(urlParts[0], "");
+        //possibleQueryOrFragment = possibleQueryOrFragment.replaceFirst("(\\?|#)", "");
 
         APIEndpoint apiEndpoint = new APIEndpoint(endpointPath);
         apiurl.endpoints.put(endpointPath, apiEndpoint);
 
-        extractQuery(toReturn, apiEndpoint);
+        extractQuery(possibleQueryOrFragment, apiEndpoint);
     }
 
     /*
@@ -203,7 +223,7 @@ public class APIURLStrategy {
      * Returns potential endpoint path + potential query string or null in case of invalid authority format
      */
     private String extractAuthority(String urlString, APIURL apiurl) {
-        String[] urlParts = urlString.split("/");
+        String[] urlParts = urlString.split("(/|\\?|#)");
 
         if (urlParts.length == 0 || urlParts[0].length() == 0) {
             return null;
@@ -211,9 +231,11 @@ public class APIURLStrategy {
 
         apiurl.authority = urlParts[0];
 
-        if (urlString.replaceFirst(urlParts[0] + "/", "") == urlString) {
+
+        if (urlString.replaceFirst(urlParts[0] + "/", "").equals(urlString)) {
             return urlString.replaceFirst(urlParts[0], "");
         }
+
 
         return urlString.replaceFirst(urlParts[0] + "/", "");
     }

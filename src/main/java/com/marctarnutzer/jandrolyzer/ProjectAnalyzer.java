@@ -74,7 +74,7 @@ public class ProjectAnalyzer implements Runnable {
         }
         this.project = new Project(this.projectFolder.getPath(), this.projectFolder.getName());
         this.apiurlStrategy = new APIURLStrategy(project);
-        this.okHttpStrategy = new OkHttpStrategy(project);
+        this.okHttpStrategy = new OkHttpStrategy(project, apiurlStrategy);
     }
 
     public void analyze() {

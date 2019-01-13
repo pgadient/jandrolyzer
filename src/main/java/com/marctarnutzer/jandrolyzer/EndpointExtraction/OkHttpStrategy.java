@@ -31,9 +31,11 @@ import java.util.List;
 public class OkHttpStrategy {
 
     Project project;
+    APIURLStrategy apiurlStrategy;
 
-    public OkHttpStrategy(Project project) {
+    public OkHttpStrategy(Project project, APIURLStrategy apiurlStrategy) {
         this.project = project;
+        this.apiurlStrategy = apiurlStrategy;
     }
 
     /*
@@ -64,6 +66,13 @@ public class OkHttpStrategy {
             }
 
             System.out.println("HttpUrl to check: " + stringsToCheck);
+
+            boolean foundValidURLs = false;
+            for (String extractedURL : stringsToCheck) {
+                foundValidURLs = apiurlStrategy.extract(extractedURL, project) || foundValidURLs;
+            }
+
+            return foundValidURLs;
         }
 
         return false;
@@ -133,6 +142,13 @@ public class OkHttpStrategy {
             System.out.println("Extracted OkHttp URLs: " + extractedUrls);
 
             // TODO: Add string values to URL collection if valid
+
+            boolean foundValidURLs = false;
+            for (String extractedURL : extractedUrls) {
+                foundValidURLs = apiurlStrategy.extract(extractedURL, project) || foundValidURLs;
+            }
+
+            return foundValidURLs;
         }
 
         return false;
@@ -326,7 +342,7 @@ public class OkHttpStrategy {
                         return null;
                     }
                     break;
-                case "addQueryParameter":
+                case "addQueryParameter": case "addEncodedQueryParameter":
                     if (methodCallExpr.getArguments().size() != 2) {
                         return null;
                     }
@@ -343,7 +359,15 @@ public class OkHttpStrategy {
                                 continue;
                             }
 
-                            queryPairs.add("&" + queryName + "=" + queryValue);
+                            if (methodCallExpr.getName().asString().equals("addQueryParameter")) {
+                                HttpUrl httpUrl = new HttpUrl.Builder().scheme("http").host("somehost.com")
+                                        .addQueryParameter(queryName, queryValue).build();
+                                String encodedQuery = httpUrl.encodedQuery();
+
+                                queryPairs.add("&" + encodedQuery);
+                            } else {
+                                queryPairs.add("&" + queryName + "=" + queryValue);
+                            }
                         }
                     }
 
@@ -398,11 +422,9 @@ public class OkHttpStrategy {
                         }
                     } else if (methodCallExpr.getName().asString().equals("fragment")) {
                         for (String argValue : argValues) {
-                            try {
-                                argValue = URLEncoder.encode(argValue, "utf-8");
-                            } catch (Exception e) {
-                                System.out.println("URLEncoder error: " + e);
-                            }
+                            HttpUrl httpUrl = new HttpUrl.Builder().scheme("http").host("somehost.com")
+                                    .fragment(argValue).build();
+                            argValue = httpUrl.encodedFragment();
                             expressionValues.add("#" + argValue);
                         }
                     } else if (methodCallExpr.getName().asString().equals("encodedFragment")) {
