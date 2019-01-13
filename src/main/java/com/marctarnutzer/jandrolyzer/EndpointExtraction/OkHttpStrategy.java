@@ -9,15 +9,15 @@ package com.marctarnutzer.jandrolyzer.EndpointExtraction;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.body.FieldDeclaration;
-import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.body.VariableDeclarator;
+import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.marctarnutzer.jandrolyzer.Project;
 import com.marctarnutzer.jandrolyzer.TypeEstimator;
@@ -90,7 +90,8 @@ public class OkHttpStrategy {
             Node containingNode = Utils.getParentClassOrMethod(variableDeclarator);
             List<String> foundValues = new LinkedList<>();
             if (containingNode instanceof MethodDeclaration) {
-                checkMethodForOkHttpBuilderNameExpr(containingNode, variableDeclarator, variableDeclarator, foundValues);
+                checkMethodForOkHttpBuilderNameExpr(containingNode, variableDeclarator,
+                        variableDeclarator.getName().asString(), foundValues);
             } else if (containingNode instanceof ClassOrInterfaceDeclaration) {
                 if (variableDeclarator.getParentNode().isPresent()
                         && variableDeclarator.getParentNode().get() instanceof FieldDeclaration) {
@@ -106,7 +107,8 @@ public class OkHttpStrategy {
                     }
 
                     for (MethodDeclaration methodDeclaration : methodDeclarations) {
-                        checkMethodForOkHttpBuilderNameExpr(methodDeclaration, fieldNode, variableDeclarator, foundValues);
+                        checkMethodForOkHttpBuilderNameExpr(methodDeclaration, fieldNode,
+                                variableDeclarator.getName().asString(), foundValues);
                     }
                 }
             }
@@ -134,11 +136,56 @@ public class OkHttpStrategy {
         return false;
     }
 
-    private void checkMethodForOkHttpBuilderNameExpr(Node node, Node variableOrFieldNode, VariableDeclarator vd,
+    private void checkMethodForOkHttpBuilderNameExpr(Node node, Node variableOrFieldNode, String variableName,
                                                              List<String> foundValues) {
         if (node instanceof MethodCallExpr) {
             MethodCallExpr methodCallExpr = (MethodCallExpr) node;
-            if (methodCallExpr.getParentNode().isPresent() && !(methodCallExpr.getParentNode().get() instanceof MethodCallExpr)) {
+
+            boolean passedAsArg = false;
+            if (methodCallExpr.getArguments().isNonEmpty()) {
+                int argPosition = -1;
+                for (int i = 0; i < methodCallExpr.getArguments().size(); i++) {
+                    Expression expression = methodCallExpr.getArguments().get(i);
+                    if (expression.isNameExpr()) {
+                        ResolvedValueDeclaration resolvedValueDeclaration = null;
+                        try {
+                            resolvedValueDeclaration = expression.asNameExpr().resolve();
+                        } catch (Exception e) {
+                            System.out.println("Error OkHttpStrategy resolving NameExpr: " + e);
+                        }
+
+                        if (resolvedValueDeclaration != null && resolvedValueDeclaration instanceof JavaParserSymbolDeclaration
+                                && ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
+                                .equals(variableOrFieldNode)) {
+                            argPosition = i;
+                        }
+                    }
+                }
+
+                if (argPosition > -1) {
+                    System.out.println("Builder is passed as argument");
+
+                    ResolvedMethodDeclaration resolvedMethodDeclaration = null;
+                    try {
+                        resolvedMethodDeclaration = methodCallExpr.resolve();
+                    } catch (Exception e) {
+                        System.out.println("Error OkHttpStrategy resolving methodCallExpr: " + e);
+                    }
+
+                    if (resolvedMethodDeclaration != null) {
+                        MethodDeclaration methodDeclaration = ((JavaParserMethodDeclaration) resolvedMethodDeclaration).getWrappedNode();
+                        Parameter parameter = methodDeclaration.getParameter(argPosition);
+                        System.out.println("Found parameter: " + parameter);
+
+                        checkMethodForOkHttpBuilderNameExpr(methodDeclaration, parameter,
+                                parameter.getName().asString(), foundValues);
+                        passedAsArg = true;
+                    }
+                }
+            }
+
+            if (methodCallExpr.getParentNode().isPresent()
+                    && !(methodCallExpr.getParentNode().get() instanceof MethodCallExpr && !passedAsArg)) {
                 NameExpr leftmostScope = getleftmostScope(methodCallExpr);
 
                 if (leftmostScope != null) {
@@ -154,17 +201,24 @@ public class OkHttpStrategy {
                         FieldDeclaration fieldDeclaration = (FieldDeclaration) variableOrFieldNode;
                         VariableDeclarator foundVD = null;
                         for (VariableDeclarator variableDeclarator : fieldDeclaration.getVariables()) {
-                            if (vd.equals(variableDeclarator)) {
+                            if (variableDeclarator.getName().asString().equals(variableName)) {
                                 foundVD = variableDeclarator;
                             }
                         }
 
                         if (foundVD != null) {
                             if (leftmostScope.getName().asString().equals(foundVD.getName().asString())) {
-                                System.out.println("Potential field match + " + node);
+                                System.out.println("Potential potential field match + " + node);
 
                                 foundPotentialMatch = true;
                             }
+                        }
+                    } else if (variableOrFieldNode instanceof Parameter) {
+                        Parameter parameter = (Parameter) variableOrFieldNode;
+                        if (leftmostScope.getName().asString().equals(parameter.getNameAsString())) {
+                            System.out.println("Found potential parameter match: " + node);
+
+                            foundPotentialMatch = true;
                         }
                     }
 
@@ -183,7 +237,10 @@ public class OkHttpStrategy {
                                     .equals(variableOrFieldNode))
                                     || (resolvedValueDeclaration instanceof JavaParserFieldDeclaration
                                     && ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode()
-                                    .equals(variableOrFieldNode))) {
+                                    .equals(variableOrFieldNode))
+                                    || (resolvedValueDeclaration instanceof JavaParserParameterDeclaration)
+                                    && ((JavaParserParameterDeclaration) resolvedValueDeclaration).getWrappedNode()
+                                    .equals(variableOrFieldNode)) {
                                 matchingType = true;
                             }
                         }
@@ -209,12 +266,10 @@ public class OkHttpStrategy {
                     }
                 }
             }
-        } else if (node instanceof NameExpr) {
-            // TODO: Check if passed as parameter to other method
         }
 
         for (Node child : node.getChildNodes()) {
-            checkMethodForOkHttpBuilderNameExpr(child, variableOrFieldNode, vd, foundValues);
+            checkMethodForOkHttpBuilderNameExpr(child, variableOrFieldNode, variableName, foundValues);
         }
     }
 
