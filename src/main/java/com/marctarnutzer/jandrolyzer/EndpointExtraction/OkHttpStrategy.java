@@ -24,7 +24,6 @@ import com.marctarnutzer.jandrolyzer.TypeEstimator;
 import com.marctarnutzer.jandrolyzer.Utils;
 import okhttp3.HttpUrl;
 
-import java.net.URLEncoder;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -140,8 +139,6 @@ public class OkHttpStrategy {
             }
 
             System.out.println("Extracted OkHttp URLs: " + extractedUrls);
-
-            // TODO: Add string values to URL collection if valid
 
             boolean foundValidURLs = false;
             for (String extractedURL : extractedUrls) {

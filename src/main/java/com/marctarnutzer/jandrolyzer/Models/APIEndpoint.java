@@ -17,6 +17,7 @@ public class APIEndpoint {
     public String path;
     public HashMap<String, String> queries = new HashMap<>();
     public Set<String> fragments = new HashSet<>();
+    public Set<String> httpMethods = new HashSet<>();
 
     public APIEndpoint(String path) {
         this.path = path;
@@ -32,6 +33,10 @@ public class APIEndpoint {
         stringBuilder.append("  Fragments: \n");
         for (String entry : this.fragments) {
             stringBuilder.append("      Fragment value: " + entry + "\n");
+        }
+        stringBuilder.append("  HTTP Methods: \n");
+        for (String entry : this.httpMethods) {
+            stringBuilder.append("      HTTP Method: " + entry + "\n");
         }
         return stringBuilder.toString();
     }

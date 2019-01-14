@@ -14,6 +14,7 @@ import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.marctarnutzer.jandrolyzer.Models.APIEndpoint;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
 import com.marctarnutzer.jandrolyzer.Project;
+import okhttp3.HttpUrl;
 
 import java.util.*;
 
@@ -134,6 +135,13 @@ public class APIURLStrategy {
         }
     }
 
+    public boolean isValidURL(String urlString) {
+        if (HttpUrl.parse(urlString) == null) {
+            return false;
+        } else {
+            return true;
+        }
+    }
 
 
     private void addAPIURLToProject(Project project, String baseURL, APIURL apiurl) {

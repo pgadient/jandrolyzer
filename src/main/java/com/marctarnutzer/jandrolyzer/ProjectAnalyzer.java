@@ -27,6 +27,7 @@ import com.github.javaparser.utils.ProjectRoot;
 import com.github.javaparser.utils.SourceRoot;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.APIURLStrategy;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.OkHttpStrategy;
+import com.marctarnutzer.jandrolyzer.EndpointExtraction.RetrofitStrategy;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.JSONStringStrategy;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.MoshiGSONStrategy;
@@ -58,6 +59,7 @@ public class ProjectAnalyzer implements Runnable {
     private JSONStringStrategy jsonStringStrategy = new JSONStringStrategy();
     private APIURLStrategy apiurlStrategy;
     private OkHttpStrategy okHttpStrategy;
+    private RetrofitStrategy retrofitStrategy;
 
     public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
                            CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
@@ -75,6 +77,7 @@ public class ProjectAnalyzer implements Runnable {
         this.project = new Project(this.projectFolder.getPath(), this.projectFolder.getName());
         this.apiurlStrategy = new APIURLStrategy(project);
         this.okHttpStrategy = new OkHttpStrategy(project, apiurlStrategy);
+        this.retrofitStrategy = new RetrofitStrategy(project, apiurlStrategy);
     }
 
     public void analyze() {
@@ -145,7 +148,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("OkHttpTesting.java")) {
+                        if (name.equals("RetrofitAPIEndpointInterface.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -468,6 +471,9 @@ public class ProjectAnalyzer implements Runnable {
                 break;
             case "build":
                 okHttpStrategy.extract((MethodCallExpr) node);
+                break;
+            case "create":
+                retrofitStrategy.extract((MethodCallExpr) node);
                 break;
         }
     }
