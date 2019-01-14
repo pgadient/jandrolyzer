@@ -174,7 +174,9 @@ public class RetrofitStrategy {
                 }
             }
 
-            apiUrl = apiUrl.replaceFirst("&", "\\?");
+            if (apiUrl.split("&")[0].length() < apiUrl.split("\\?")[0].length()) {
+                apiUrl = apiUrl.replaceFirst("&", "\\?");
+            }
 
             apiEndpoints.add(apiUrl);
         }
