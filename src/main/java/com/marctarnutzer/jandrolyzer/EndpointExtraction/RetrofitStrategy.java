@@ -21,7 +21,9 @@ import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.resolution.types.ResolvedReferenceType;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserInterfaceDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
+import com.marctarnutzer.jandrolyzer.DeclarationLocator;
 import com.marctarnutzer.jandrolyzer.Project;
+import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.MoshiGSONStrategy;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -30,10 +32,12 @@ public class RetrofitStrategy {
 
     Project project;
     APIURLStrategy apiurlStrategy;
+    public MoshiGSONStrategy moshiGSONStrategy;
 
-    public RetrofitStrategy(Project project, APIURLStrategy apiurlStrategy) {
+    public RetrofitStrategy(Project project, APIURLStrategy apiurlStrategy, MoshiGSONStrategy moshiGSONStrategy) {
         this.project = project;
         this.apiurlStrategy = apiurlStrategy;
+        this.moshiGSONStrategy = moshiGSONStrategy;
     }
 
     public boolean extract(MethodCallExpr methodCallExpr) {
@@ -63,7 +67,7 @@ public class RetrofitStrategy {
             return false;
         }
 
-        String converterKind;
+        String converterKind = null;
         List<String> baseUrls = null;
         if (resolvedValueDeclaration instanceof JavaParserSymbolDeclaration) {
             Node declarationNode = ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode();
@@ -100,15 +104,23 @@ public class RetrofitStrategy {
                 return false;
             }
 
-            ClassOrInterfaceDeclaration interfaceDeclaration = ((JavaParserInterfaceDeclaration) resolvedReferenceType.getTypeDeclaration().asInterface()).getWrappedNode();
+            ClassOrInterfaceDeclaration interfaceDeclaration = ((JavaParserInterfaceDeclaration) resolvedReferenceType
+                    .getTypeDeclaration().asInterface()).getWrappedNode();
 
-            return extractInterfaceAPIURLs(interfaceDeclaration, baseUrls);
+            interfaceDeclaration = DeclarationLocator.locate(interfaceDeclaration, ClassOrInterfaceDeclaration.class);
+
+            if (interfaceDeclaration == null) {
+                return false;
+            }
+
+            return extractInterfaceAPIURLs(interfaceDeclaration, baseUrls, converterKind);
         }
 
         return false;
     }
 
-    private boolean extractInterfaceAPIURLs(ClassOrInterfaceDeclaration interfaceDeclaration, List<String> baseUrls) {
+    private boolean extractInterfaceAPIURLs(ClassOrInterfaceDeclaration interfaceDeclaration, List<String> baseUrls,
+                                            String converterKind) {
         List<MethodDeclaration> methodDeclarations = interfaceDeclaration.findAll(MethodDeclaration.class);
 
         List<String> apiEndpoints = new LinkedList<>();
@@ -170,6 +182,14 @@ public class RetrofitStrategy {
                                 .getMemberValue().asStringLiteralExpr().getValue();
 
                         apiUrl = apiUrl + "&" + toInsert + "=" + typeString;
+                    }
+                } else if (parameter.getAnnotations().size() == 1 && parameter.getAnnotation(0)
+                        .isMarkerAnnotationExpr()) {
+                    if (converterKind != null && parameter.getAnnotation(0).asMarkerAnnotationExpr().getName()
+                            .asString().equals("Body")) {
+                        // Extract JSON structure of this API call
+
+                        moshiGSONStrategy.extract(parameter.getType().asClassOrInterfaceType(), converterKind);
                     }
                 }
             }

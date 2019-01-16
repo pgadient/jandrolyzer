@@ -12,19 +12,18 @@ import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
+import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
-import com.marctarnutzer.jandrolyzer.JSONDataType;
-import com.marctarnutzer.jandrolyzer.JSONObject;
-import com.marctarnutzer.jandrolyzer.JSONRoot;
-import com.marctarnutzer.jandrolyzer.TypeEstimator;
+import com.marctarnutzer.jandrolyzer.*;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -52,6 +51,12 @@ public class MoshiGSONStrategy {
             "java.lang.Integer",
             "java.lang.Boolean"));
 
+    Project project;
+
+    public MoshiGSONStrategy(Project project) {
+        this.project = project;
+    }
+
     private boolean isValidGSONType(String typeString) {
        return validGSONClasses.contains(typeString);
     }
@@ -64,7 +69,7 @@ public class MoshiGSONStrategy {
         return validSimpleJSONDataTypes.contains(typeString);
     }
 
-    private CombinedTypeSolver combinedTypeSolver;
+    public CombinedTypeSolver combinedTypeSolver;
     private String scopeExprTypeString = null;
 
     public void extract(Node node, String path, Map<String, JSONRoot> jsonModels, CombinedTypeSolver combinedTypeSolver) {
@@ -79,6 +84,34 @@ public class MoshiGSONStrategy {
                 pojoToJsonExtraction(node, path, jsonModels);
             }
         }
+    }
+
+    /*
+     * Extract GSON or MOSHI JSON data from ClassOrInterfaceType
+     */
+    public void extract(ClassOrInterfaceType classOrInterfaceType, String converterKind) {
+        ResolvedType resolvedType;
+        try {
+            resolvedType = classOrInterfaceType.resolve();
+        } catch (Exception e) {
+            System.out.println("Error resolving Body type: " + e);
+            return;
+        }
+
+        if (resolvedType == null || !resolvedType.isReferenceType()) {
+            return;
+        }
+
+        ResolvedReferenceTypeDeclaration resolvedReferenceTypeDeclaration = resolvedType
+                .asReferenceType().getTypeDeclaration();
+
+        String modelPath = classOrInterfaceType.findCompilationUnit().get().getStorage().get()
+                .getSourceRoot() + "/" + resolvedReferenceTypeDeclaration.getQualifiedName()
+                .replace(".", "/") + ".java";
+        
+        analyzeFields(new HashSet<>(resolvedReferenceTypeDeclaration.getDeclaredFields()), modelPath,
+                resolvedReferenceTypeDeclaration.getName(),
+                project.jsonModels, null, null);
     }
 
     private void jsonObjectExtraction(Node node, String path, Map<String, JSONRoot> jsonModels) {
@@ -415,6 +448,8 @@ public class MoshiGSONStrategy {
 
         if (jsonRoot != null && jsonRoot.jsonObject != null && !jsonRoot.jsonObject.linkedHashMap.isEmpty()) {
             jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
+
+            System.out.println("Added new jsonModels entry.");
 
             if (isValidGSONType(scopeExprTypeString)) {
                 jsonRoot.library = "com.google.code.gson";

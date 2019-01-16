@@ -20,6 +20,7 @@ import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
+import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 import com.github.javaparser.symbolsolver.utils.SymbolSolverCollectionStrategy;
 import com.github.javaparser.utils.ParserCollectionStrategy;
@@ -55,7 +56,7 @@ public class ProjectAnalyzer implements Runnable {
     private String libraryFolderPath;
     private ORGJSONStrategy orgjsonStrategy = new ORGJSONStrategy();
     private Map<String, JSONRoot> jsonModels = new HashMap<>();
-    private MoshiGSONStrategy moshiGsonStrategy = new MoshiGSONStrategy();
+    private MoshiGSONStrategy moshiGsonStrategy;
     private JSONStringStrategy jsonStringStrategy = new JSONStringStrategy();
     private APIURLStrategy apiurlStrategy;
     private OkHttpStrategy okHttpStrategy;
@@ -77,7 +78,9 @@ public class ProjectAnalyzer implements Runnable {
         this.project = new Project(this.projectFolder.getPath(), this.projectFolder.getName());
         this.apiurlStrategy = new APIURLStrategy(project);
         this.okHttpStrategy = new OkHttpStrategy(project, apiurlStrategy);
-        this.retrofitStrategy = new RetrofitStrategy(project, apiurlStrategy);
+        this.moshiGsonStrategy = new MoshiGSONStrategy(project);
+        this.retrofitStrategy = new RetrofitStrategy(project, apiurlStrategy, moshiGsonStrategy);
+        this.project.jsonModels = jsonModels;
     }
 
     public void analyze() {
@@ -88,6 +91,8 @@ public class ProjectAnalyzer implements Runnable {
             this.combinedTypeSolver = new CombinedTypeSolver();
             //this.combinedTypeSolver.add(new JavaParserTypeSolver(projectFolder.toPath()));
             this.combinedTypeSolver.add(new ReflectionTypeSolver(false));
+
+            this.moshiGsonStrategy.combinedTypeSolver = combinedTypeSolver;
 
             LinkedList<String> gradleFilePaths = new LinkedList<>();
             getGradleFilePaths(gradleFilePaths, this.project.path);
@@ -124,6 +129,8 @@ public class ProjectAnalyzer implements Runnable {
                 return;
             }
         }
+
+        DeclarationLocator.compilationUnits = this.project.compilationUnits;
 
         List<CompilationUnit> compilationUnits = null;
         for (SourceRoot sourceRoot : projectRoot.getSourceRoots()) {
@@ -591,7 +598,7 @@ public class ProjectAnalyzer implements Runnable {
     public void run() {
         analyze();
 
-        this.project.jsonModels = jsonModels;
+        //this.project.jsonModels = jsonModels;
 
         System.out.println(jsonModels.size() + " detected JSON models:");
         for (Map.Entry<String, JSONRoot> jsonRootEntry : this.jsonModels.entrySet()) {
