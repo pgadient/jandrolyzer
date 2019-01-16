@@ -322,7 +322,7 @@ public class ProjectAnalyzer implements Runnable {
         }
 
         // Check if StringLiteralExpr is a valid API URL
-        boolean foundAPIURL = apiurlStrategy.extract(((StringLiteralExpr) node).getValue(), this.project);
+        boolean foundAPIURL = apiurlStrategy.extract(((StringLiteralExpr) node).getValue(), this.project, null);
     }
 
     private void analyzeBinaryExpr(Node node, String path) {

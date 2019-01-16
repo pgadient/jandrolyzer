@@ -108,7 +108,7 @@ public class MoshiGSONStrategy {
         String modelPath = classOrInterfaceType.findCompilationUnit().get().getStorage().get()
                 .getSourceRoot() + "/" + resolvedReferenceTypeDeclaration.getQualifiedName()
                 .replace(".", "/") + ".java";
-        
+
         analyzeFields(new HashSet<>(resolvedReferenceTypeDeclaration.getDeclaredFields()), modelPath,
                 resolvedReferenceTypeDeclaration.getName(),
                 project.jsonModels, null, null);

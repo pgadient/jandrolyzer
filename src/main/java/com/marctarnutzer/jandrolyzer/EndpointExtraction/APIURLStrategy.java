@@ -27,7 +27,7 @@ public class APIURLStrategy {
         ExpressionValueExtraction.project = project;
     }
 
-    public boolean extract(String potentialURL, Project project) {
+    public boolean extract(String potentialURL, Project project, String httpMethod) {
         String urlScheme = getScheme(potentialURL);
         if (urlScheme == null) {
             return false;
@@ -45,7 +45,7 @@ public class APIURLStrategy {
             return true;
         }
 
-        extractEndpoint(potentialURL, apiurl);
+        extractEndpoint(potentialURL, apiurl, httpMethod);
 
         addAPIURLToProject(project, apiurl.getBaseURL(), apiurl);
         return true;
@@ -67,7 +67,7 @@ public class APIURLStrategy {
         boolean foundValidURL = false;
 
         for (String serializedBinaryExpr : serializedBinaryExprs) {
-            foundValidURL = extract(serializedBinaryExpr, project) || foundValidURL;
+            foundValidURL = extract(serializedBinaryExpr, project, null) || foundValidURL;
         }
 
         return foundValidURL;
@@ -87,7 +87,7 @@ public class APIURLStrategy {
 
                 boolean foundAPIURL = false;
                 for (String potentialAPIURL : potentialApiURLs) {
-                    foundAPIURL = extract(potentialAPIURL, project) || foundAPIURL;
+                    foundAPIURL = extract(potentialAPIURL, project, null) || foundAPIURL;
                 }
 
                 return foundAPIURL;
@@ -116,7 +116,7 @@ public class APIURLStrategy {
         }
 
         for (String stringToCheck : stringsToCheck) {
-            extract(stringToCheck, project);
+            extract(stringToCheck, project, null);
         }
     }
 
@@ -131,7 +131,7 @@ public class APIURLStrategy {
         }
 
         for (String tc : toCheck) {
-            extract(tc, project);
+            extract(tc, project, null);
         }
     }
 
@@ -159,6 +159,8 @@ public class APIURLStrategy {
                                 .queries.put(queryEntry.getKey(), queryEntry.getValue());
                     }
                 }
+
+                project.apiURLs.get(baseURL).endpoints.get(apiEndpoint.path).httpMethods.addAll(apiEndpoint.httpMethods);
             } else {
                 project.apiURLs.get(baseURL).endpoints.put(apiEndpoint.path, apiEndpoint);
             }
@@ -205,7 +207,7 @@ public class APIURLStrategy {
     /*
      * Extracts the endpoint path & query key value pairs and assigns their values to the APIURL object
      */
-    private void extractEndpoint(String endpointString, APIURL apiurl) {
+    private void extractEndpoint(String endpointString, APIURL apiurl, String httpMethod) {
         String[] urlParts = endpointString.split("(\\?|#)");
 
         if (urlParts.length == 0) {
@@ -221,6 +223,9 @@ public class APIURLStrategy {
         //possibleQueryOrFragment = possibleQueryOrFragment.replaceFirst("(\\?|#)", "");
 
         APIEndpoint apiEndpoint = new APIEndpoint(endpointPath);
+        if (httpMethod != null) {
+            apiEndpoint.httpMethods.add(httpMethod);
+        }
         apiurl.endpoints.put(endpointPath, apiEndpoint);
 
         extractQuery(possibleQueryOrFragment, apiEndpoint);

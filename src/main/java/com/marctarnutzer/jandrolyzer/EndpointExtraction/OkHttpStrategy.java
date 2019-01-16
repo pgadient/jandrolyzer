@@ -68,7 +68,7 @@ public class OkHttpStrategy {
 
             boolean foundValidURLs = false;
             for (String extractedURL : stringsToCheck) {
-                foundValidURLs = apiurlStrategy.extract(extractedURL, project) || foundValidURLs;
+                foundValidURLs = apiurlStrategy.extract(extractedURL, project, null) || foundValidURLs;
             }
 
             return foundValidURLs;
@@ -142,7 +142,7 @@ public class OkHttpStrategy {
 
             boolean foundValidURLs = false;
             for (String extractedURL : extractedUrls) {
-                foundValidURLs = apiurlStrategy.extract(extractedURL, project) || foundValidURLs;
+                foundValidURLs = apiurlStrategy.extract(extractedURL, project, null) || foundValidURLs;
             }
 
             return foundValidURLs;

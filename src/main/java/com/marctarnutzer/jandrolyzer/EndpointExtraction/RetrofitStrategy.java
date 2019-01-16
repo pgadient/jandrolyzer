@@ -124,6 +124,7 @@ public class RetrofitStrategy {
         List<MethodDeclaration> methodDeclarations = interfaceDeclaration.findAll(MethodDeclaration.class);
 
         List<String> apiEndpoints = new LinkedList<>();
+        boolean extractedValidAPIURL = false;
         for (MethodDeclaration methodDeclaration : methodDeclarations) {
             if (methodDeclaration.getAnnotations().isEmpty()) {
                 continue;
@@ -198,29 +199,26 @@ public class RetrofitStrategy {
                 apiUrl = apiUrl.replaceFirst("&", "\\?");
             }
 
-            apiEndpoints.add(apiUrl);
-        }
+            //apiEndpoints.add(apiUrl);
 
-        List<String> fullURLs = new LinkedList<>();
-        if (baseUrls != null) {
-            for (String baseURL : baseUrls) {
-                for (String endpoint : apiEndpoints) {
-                    if (apiurlStrategy.isValidURL(endpoint)) {
-                        fullURLs.add(endpoint);
+            List<String> fullURLs = new LinkedList<>();
+            if (baseUrls != null) {
+                for (String baseURL : baseUrls) {
+                    if (apiurlStrategy.isValidURL(apiUrl)) {
+                        fullURLs.add(apiUrl);
                     } else {
-                        fullURLs.add(baseURL + endpoint);
+                        fullURLs.add(baseURL + apiUrl);
                     }
                 }
+            } else {
+                fullURLs.add(apiUrl);
             }
-        } else {
-            fullURLs.addAll(apiEndpoints);
-        }
 
-        System.out.println("URLs to check: " + fullURLs);
+            System.out.println("URLs to check: " + fullURLs);
 
-        boolean extractedValidAPIURL = false;
-        for (String url : fullURLs) {
-            extractedValidAPIURL = apiurlStrategy.extract(url, project) || extractedValidAPIURL;
+            for (String url : fullURLs) {
+                extractedValidAPIURL = apiurlStrategy.extract(url, project, httpMethod) || extractedValidAPIURL;
+            }
         }
 
         return extractedValidAPIURL;
