@@ -25,6 +25,7 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
+import com.marctarnutzer.jandrolyzer.DeclarationLocator;
 import com.marctarnutzer.jandrolyzer.Project;
 import com.marctarnutzer.jandrolyzer.Utils;
 
@@ -600,6 +601,8 @@ public class ExpressionValueExtraction {
 
                 MethodDeclaration methodDeclaration = ((JavaParserMethodDeclaration) resolvedMethodDeclaration)
                         .getWrappedNode();
+
+                methodDeclaration = DeclarationLocator.locate(methodDeclaration, MethodDeclaration.class);
 
                 List<ReturnStmt> returnStmts = methodDeclaration.findAll(ReturnStmt.class);
                 List<String> toReturn = new LinkedList<>();

@@ -140,7 +140,8 @@ public class RetrofitStrategy {
                 if (annotationExpr.getName().asString().equals("GET")
                         || annotationExpr.getName().asString().equals("POST")
                         || annotationExpr.getName().asString().equals("PATCH")
-                        || annotationExpr.getName().asString().equals("DELETE")) {
+                        || annotationExpr.getName().asString().equals("DELETE")
+                        || annotationExpr.getName().asString().equals("PUT")) {
                     Expression memberValueExpr = annotationExpr.asSingleMemberAnnotationExpr().getMemberValue();
                     if (memberValueExpr.isStringLiteralExpr()) {
                         apiUrl = memberValueExpr.asStringLiteralExpr().getValue();
