@@ -250,6 +250,9 @@ public class MoshiGSONStrategy {
             //System.out.println("Type: " + resolvedFieldDeclaration.getType());
 
             FieldDeclaration fieldDeclaration = ((JavaParserFieldDeclaration)resolvedFieldDeclaration).getWrappedNode();
+            fieldDeclaration = DeclarationLocator.locate(fieldDeclaration, FieldDeclaration.class);
+
+            System.out.println("Found fieldDeclaration: " + fieldDeclaration);
 
             // Don't include transient fields in JSON representation
             if (fieldDeclaration.isTransient()) {
@@ -351,7 +354,8 @@ public class MoshiGSONStrategy {
                                 toInsert = new JSONObject(JSONDataType.ARRAY, null, null);
 
                                 Type typeArgumentType = fieldType.asClassOrInterfaceType().getTypeArguments().get().get(0);
-                                ResolvedType resolvedTypeArgType = JavaParserFacade.get(combinedTypeSolver).convertToUsage(typeArgumentType);
+                                //ResolvedType resolvedTypeArgType = JavaParserFacade.get(combinedTypeSolver).convertToUsage(typeArgumentType);
+                                ResolvedType resolvedTypeArgType = typeArgumentType.resolve();
 
                                 if (resolvedTypeArgType.isReferenceType()) {
                                     if (isValidSimpleJSONDataType(resolvedTypeArgType.asReferenceType().getQualifiedName())) {
@@ -377,8 +381,9 @@ public class MoshiGSONStrategy {
                                     fieldType.asClassOrInterfaceType().getTypeArguments().get().size() == 2) {
 
                                 Type firstTypeArgumentType = fieldType.asClassOrInterfaceType().getTypeArguments().get().get(0);
-                                ResolvedType resolvedFirstTypeArgumentType = JavaParserFacade.get(combinedTypeSolver)
-                                        .convertToUsage(firstTypeArgumentType);
+                                ResolvedType resolvedFirstTypeArgumentType = firstTypeArgumentType.resolve();
+                                //ResolvedType resolvedFirstTypeArgumentType = JavaParserFacade.get(combinedTypeSolver)
+                                //        .convertToUsage(firstTypeArgumentType);
 
                                 if (resolvedFirstTypeArgumentType.isReferenceType() &&
                                         resolvedFirstTypeArgumentType.asReferenceType().getQualifiedName()
@@ -387,8 +392,9 @@ public class MoshiGSONStrategy {
                                     toInsert = new JSONObject(JSONDataType.ARRAY, null, null);
 
                                     Type secondTypeArgumentType = fieldType.asClassOrInterfaceType().getTypeArguments().get().get(1);
-                                    ResolvedType resolvedSecondTypeArgumentType = JavaParserFacade.get(combinedTypeSolver)
-                                            .convertToUsage(secondTypeArgumentType);
+                                    ResolvedType resolvedSecondTypeArgumentType = secondTypeArgumentType.resolve();
+                                   // ResolvedType resolvedSecondTypeArgumentType = JavaParserFacade.get(combinedTypeSolver)
+                                    //        .convertToUsage(secondTypeArgumentType);
 
                                     if (resolvedSecondTypeArgumentType.isReferenceType()) {
                                         if (isValidSimpleJSONDataType(resolvedSecondTypeArgumentType.asReferenceType()
