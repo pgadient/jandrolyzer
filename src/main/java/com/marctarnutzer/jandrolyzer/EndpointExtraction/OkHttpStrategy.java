@@ -19,11 +19,11 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
-import com.marctarnutzer.jandrolyzer.Project;
-import com.marctarnutzer.jandrolyzer.TypeEstimator;
-import com.marctarnutzer.jandrolyzer.Utils;
+import com.marctarnutzer.jandrolyzer.*;
+import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.JSONStringStrategy;
 import okhttp3.HttpUrl;
 
+import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -31,10 +31,12 @@ public class OkHttpStrategy {
 
     Project project;
     APIURLStrategy apiurlStrategy;
+    JSONStringStrategy jsonStringStrategy;
 
-    public OkHttpStrategy(Project project, APIURLStrategy apiurlStrategy) {
+    public OkHttpStrategy(Project project, APIURLStrategy apiurlStrategy, JSONStringStrategy jsonStringStrategy) {
         this.project = project;
         this.apiurlStrategy = apiurlStrategy;
+        this.jsonStringStrategy = jsonStringStrategy;
     }
 
     /*
@@ -42,7 +44,7 @@ public class OkHttpStrategy {
      *
      * Return true if a valid URL was found, false otherwise
      */
-    public boolean extract(MethodCallExpr methodCallExpr) {
+    public boolean extract(MethodCallExpr methodCallExpr, String httpMethod) {
         if (!methodCallExpr.getScope().isPresent()) {
             return false;
         }
@@ -68,10 +70,15 @@ public class OkHttpStrategy {
 
             boolean foundValidURLs = false;
             for (String extractedURL : stringsToCheck) {
-                foundValidURLs = apiurlStrategy.extract(extractedURL, project, null) || foundValidURLs;
+                foundValidURLs = apiurlStrategy.extract(extractedURL, project, httpMethod) || foundValidURLs;
             }
 
             return foundValidURLs;
+        } else if (estimatedType.equals("okhttp3.Request")) {
+            System.out.println("Found okhttp3.Request: " + methodCallExpr);
+
+            List<String> foundURLs = new LinkedList<>();
+            extractRequest(methodCallExpr, foundURLs, null);
         }
 
         return false;
@@ -151,6 +158,129 @@ public class OkHttpStrategy {
         return false;
     }
 
+    private String extractRequest(MethodCallExpr methodCallExpr, List<String> foundURLs, String httpMethod) {
+        System.out.println("Extracting request for: " + methodCallExpr);
+
+        if (!methodCallExpr.getScope().isPresent()) {
+            System.out.println("Scope not present");
+            return httpMethod;
+        }
+
+        if (methodCallExpr.getName().asString().equals("post")
+                || methodCallExpr.getName().asString().equals("patch")
+                || methodCallExpr.getName().asString().equals("put")
+                || methodCallExpr.getName().asString().equals("delete")) {
+            String extractedHttpMethod = methodCallExpr.getNameAsString().toUpperCase();
+
+            System.out.println("HTTP METHOD extracted: " + extractedHttpMethod);
+
+            if (methodCallExpr.getArguments().size() != 1) {
+                if (methodCallExpr.getScope().get().isMethodCallExpr()) {
+                    return extractRequest(methodCallExpr.getScope().get().asMethodCallExpr(), foundURLs, extractedHttpMethod);
+                } else {
+                    return null;
+                }
+            }
+
+            Expression bodyExpr = methodCallExpr.getArgument(0);
+
+            if (TypeEstimator.estimateTypeName(bodyExpr).equals("RequestBody")
+                    || TypeEstimator.estimateTypeName(bodyExpr).equals("okhttp3.RequestBody")
+                    || TypeEstimator.estimateTypeName(bodyExpr).equals("okhttp.RequestBody")) {
+                System.out.println("Body expr: " + bodyExpr);
+
+                List<MethodCallExpr> requestBodyMCEs = new LinkedList<>();
+                if (bodyExpr.isNameExpr()) {
+                    List<Node> assignedNodes = AssignmentLocator.nameExprGetLastAssignedNode((NameExpr) bodyExpr, project);
+
+                    System.out.println("Body assignment nodes: " + assignedNodes);
+
+                    if (assignedNodes == null) {
+                        return null;
+                    }
+
+                    for (Node assignedNode : assignedNodes) {
+                        if (assignedNode instanceof MethodCallExpr) {
+                            System.out.println("Method call expr body assignment found: " + assignedNode);
+                            requestBodyMCEs.add((MethodCallExpr) assignedNode);
+                        }
+                    }
+                } else if (bodyExpr.isMethodCallExpr()) {
+                    requestBodyMCEs.add(bodyExpr.asMethodCallExpr());
+                }
+
+                List<String> bodyValues = new LinkedList<>();
+                for (MethodCallExpr requestBodyMCE : requestBodyMCEs) {
+                    if (requestBodyMCE.getNameAsString().equals("create") && requestBodyMCE.getArguments().size() == 2) {
+                        bodyValues.addAll(ExpressionValueExtraction.getExpressionValue(requestBodyMCE.getArgument(1)));
+                    }
+                }
+
+                System.out.println("Extracted body values: " + bodyValues);
+
+                String path = null;
+                if (bodyExpr.findCompilationUnit().isPresent()) {
+                    path = bodyExpr.findCompilationUnit().get().getStorage().map(CompilationUnit.Storage::getPath)
+                            .map(Path::toString).orElse("");
+                }
+
+                for (String bodyValue : bodyValues) {
+                    jsonStringStrategy.parse(bodyValue, path, project.jsonModels);
+                }
+            }
+
+            // TODO: Add functionality for unknown values to ExpressionValueExtraction.getExpressionValue()
+
+            if (methodCallExpr.getScope().get().isMethodCallExpr()) {
+                return extractRequest(methodCallExpr.getScope().get().asMethodCallExpr(), foundURLs, extractedHttpMethod);
+            }
+        } else if (methodCallExpr.getNameAsString().equals("url")) {
+            System.out.println("Extracting url parameter...");
+
+            if (methodCallExpr.getArguments().size() != 1) {
+                return null;
+            }
+
+            Expression argument = methodCallExpr.getArgument(0);
+
+            if (argument.isNameExpr()) {
+                String estimatedType = TypeEstimator.estimateTypeName(argument.asNameExpr());
+
+                if (estimatedType == null) {
+                    return null;
+                }
+
+                if (!(estimatedType.equals("okhttp3.HttpUrl") || estimatedType.equals("okhttp.HttpUrl"))) {
+                    return null;
+                }
+
+                List<Node> assignedNodes= AssignmentLocator.nameExprGetLastAssignedNode(argument.asNameExpr(), project);
+                if (assignedNodes == null) {
+                    return null;
+                }
+
+                for (Node assignedNode : assignedNodes) {
+                    System.out.println("Assigned node found: " + assignedNode + ", class: " + assignedNode.getClass());
+
+                    if (!(assignedNode instanceof MethodCallExpr)) {
+                        continue;
+                    }
+
+                    extract((MethodCallExpr) assignedNode, httpMethod);
+                }
+            }
+
+            if (methodCallExpr.getScope().get().isMethodCallExpr()) {
+                return extractRequest(methodCallExpr.getScope().get().asMethodCallExpr(), foundURLs, httpMethod);
+            }
+        } else if (methodCallExpr.getScope().get().isMethodCallExpr()) {
+            System.out.println("Skipping...");
+            return extractRequest(methodCallExpr.getScope().get().asMethodCallExpr(), foundURLs, httpMethod);
+        }
+
+        return httpMethod;
+    }
+
     private void checkMethodForOkHttpBuilderNameExpr(Node node, Node variableOrFieldNode, String variableName,
                                                              List<String> foundValues) {
         if (node instanceof MethodCallExpr) {
@@ -223,7 +353,7 @@ public class OkHttpStrategy {
 
                         if (foundVD != null) {
                             if (leftmostScope.getName().asString().equals(foundVD.getName().asString())) {
-                                System.out.println("Potential potential field match + " + node);
+                                System.out.println("Found potential field match + " + node);
 
                                 foundPotentialMatch = true;
                             }

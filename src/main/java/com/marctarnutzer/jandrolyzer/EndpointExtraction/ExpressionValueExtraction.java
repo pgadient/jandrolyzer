@@ -25,6 +25,7 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
+import com.github.javaparser.symbolsolver.reflectionmodel.ReflectionMethodDeclaration;
 import com.marctarnutzer.jandrolyzer.DeclarationLocator;
 import com.marctarnutzer.jandrolyzer.Project;
 import com.marctarnutzer.jandrolyzer.Utils;
@@ -596,6 +597,11 @@ public class ExpressionValueExtraction {
                 System.out.println("Resolved MethodCallExpr: " + resolvedMethodDeclaration);
 
                 if (resolvedMethodDeclaration == null) {
+                    return null;
+                }
+
+                if (resolvedMethodDeclaration instanceof ReflectionMethodDeclaration) {
+                    // TODO: Return type as string: <TYPE INFO>
                     return null;
                 }
 

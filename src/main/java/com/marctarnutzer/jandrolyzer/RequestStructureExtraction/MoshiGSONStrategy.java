@@ -19,7 +19,6 @@ import com.github.javaparser.resolution.declarations.ResolvedFieldDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedReferenceTypeDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.resolution.types.ResolvedType;
-import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
@@ -337,7 +336,6 @@ public class MoshiGSONStrategy {
                         Type fieldType = fieldDeclaration.getElementType();
                         System.out.println("Field declaration: " + fieldDeclaration + ", type: " + fieldType);
 
-                        // TODO: Ask maintainers why this approach is necessary and why fieldType.resolve() doesn't work
                         ResolvedType resolvedType = fieldType.resolve();
                         //ResolvedType resolvedType = JavaParserFacade.get(combinedTypeSolver).convertToUsage(fieldType);
                         System.out.println("Field type: " + resolvedType.asReferenceType());

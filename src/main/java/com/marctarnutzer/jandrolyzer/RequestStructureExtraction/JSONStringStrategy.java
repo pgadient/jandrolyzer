@@ -27,14 +27,28 @@ public class JSONStringStrategy {
      * Returns boolean value whether valid JSON model was found or not
      */
     public boolean parse(StringLiteralExpr stringLiteralExpr, String path, Map<String, JSONRoot> jsonModels) {
-        String toCheck = Utils.removeEscapeSequencesFrom(stringLiteralExpr.getValue());
+        return (parse(stringLiteralExpr.getValue(), path, jsonModels));
+    }
+
+    public boolean parse(String potJSONString, String path, Map<String, JSONRoot> jsonModels) {
+        String toCheck = Utils.removeEscapeSequencesFrom(potJSONString);
 
         JSONRoot jsonRoot = jsonDeserializer.deserialize(toCheck, path);
 
         if (jsonRoot != null) {
             jsonRoot.salt = UUID.randomUUID().toString().replace("-", "");
             jsonRoot.library = "noLib.StringLiteralExpr";
-            jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
+
+            boolean isDuplicate = false;
+            for (Map.Entry<String, JSONRoot> entry : jsonModels.entrySet()) {
+                if (entry.getValue().formatJSON().equals(toCheck)) {
+                    isDuplicate = true;
+                }
+            }
+
+            if (!isDuplicate) {
+                jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
+            }
         } else {
             return false;
         }

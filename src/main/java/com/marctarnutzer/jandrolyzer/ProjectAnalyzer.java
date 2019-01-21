@@ -77,7 +77,7 @@ public class ProjectAnalyzer implements Runnable {
         }
         this.project = new Project(this.projectFolder.getPath(), this.projectFolder.getName());
         this.apiurlStrategy = new APIURLStrategy(project);
-        this.okHttpStrategy = new OkHttpStrategy(project, apiurlStrategy);
+        this.okHttpStrategy = new OkHttpStrategy(project, apiurlStrategy, jsonStringStrategy);
         this.moshiGsonStrategy = new MoshiGSONStrategy(project);
         this.retrofitStrategy = new RetrofitStrategy(project, apiurlStrategy, moshiGsonStrategy);
         this.project.jsonModels = jsonModels;
@@ -155,7 +155,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("RetrofitAPIEndpointInterface.java")) {
+                        if (name.equals("OkHttpTesting.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -477,7 +477,7 @@ public class ProjectAnalyzer implements Runnable {
                 apiurlStrategy.extract((MethodCallExpr) node, this.project);
                 break;
             case "build":
-                okHttpStrategy.extract((MethodCallExpr) node);
+                okHttpStrategy.extract((MethodCallExpr) node, null);
                 break;
             case "create":
                 retrofitStrategy.extract((MethodCallExpr) node);
