@@ -39,9 +39,6 @@ import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.ORGJSONStrategy;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Semaphore;
 
 public class ProjectAnalyzer implements Runnable {
 
@@ -49,12 +46,10 @@ public class ProjectAnalyzer implements Runnable {
     private File projectFolder;
     private Map<String, HashSet<String>> libraries;
     private CombinedTypeSolver combinedTypeSolver;
-    private ArrayBlockingQueue<Project> projects;
-    private CountDownLatch latch;
+    private List<Project> projects;
     private int totalProjects;
     private boolean enableSymbolSolving = true;
     private boolean shouldPrintAST = true;
-    private Semaphore concAnalyzers;
     private String libraryFolderPath;
     private ORGJSONStrategy orgjsonStrategy = new ORGJSONStrategy();
     private Map<String, JSONRoot> jsonModels = new HashMap<>();
@@ -64,13 +59,11 @@ public class ProjectAnalyzer implements Runnable {
     private OkHttpStrategy okHttpStrategy;
     private RetrofitStrategy retrofitStrategy;
 
-    public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, ArrayBlockingQueue<Project> projects,
-                           CountDownLatch latch, int totalProjects, Semaphore concAnalyzers, String libraryFolderPath) throws FileNotFoundException {
+    public ProjectAnalyzer(String path, Map<String, HashSet<String>> libraries, List<Project> projects,
+                           int totalProjects, String libraryFolderPath) throws FileNotFoundException {
         this.libraries = libraries;
         this.projects = projects;
-        this.latch = latch;
         this.totalProjects = totalProjects;
-        this.concAnalyzers = concAnalyzers;
         this.libraryFolderPath = libraryFolderPath;
 
         this.projectFolder = new File(path);
@@ -600,8 +593,6 @@ public class ProjectAnalyzer implements Runnable {
     public void run() {
         analyze();
 
-        //this.project.jsonModels = jsonModels;
-
         System.out.println(jsonModels.size() + " detected JSON models:");
         for (Map.Entry<String, JSONRoot> jsonRootEntry : this.jsonModels.entrySet()) {
             //System.out.println("ID: " + jsonRootEntry.getKey() + "\n" + jsonRootEntry.getValue().toString());
@@ -615,7 +606,5 @@ public class ProjectAnalyzer implements Runnable {
 
         JavaParserFacade.clearInstances();
         System.out.println("Processed: " + projects.size() + " of " + totalProjects);
-        latch.countDown();
-        concAnalyzers.release();
     }
 }

@@ -9,7 +9,6 @@ package com.marctarnutzer.jandrolyzer;
 
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import com.beust.jcommander.JCommander;
@@ -43,9 +42,6 @@ public class Main {
     // Additional arguments
     @Parameter(names = {"--libraries_path", "-lp"}, description = "Location of libraries", required = true)
     private static List<String> librariesPath = new ArrayList<>();
-
-    @Parameter(names = {"--multithreaded", "-m"}, description = "Scan multiple projects at once")
-    private static boolean multithreaded = false;
 
     // HashSet not ordered according to insertion order
     static HashMap<String, HashSet<String>> libraries = new HashMap<>();
@@ -86,7 +82,8 @@ public class Main {
         }
 
         String path = stringBuilder.toString().substring(0, stringBuilder.toString().length() - 2);
-/*
+
+        /*
         if (path.startsWith("\"") && path.endsWith("\"")) {
             path = path.substring(1, path.length() - 1);
         }
@@ -117,18 +114,16 @@ public class Main {
     }
 
     static void analyzeSingleProject(String projectPath, String librariesPath) {
-        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<>(1);
-        CountDownLatch latch = new CountDownLatch(1);
-        Semaphore concurrentAnalyzers = new Semaphore(1);
+        List<Project> projects = new LinkedList<>();
 
         try {
-            ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectPath, libraries, projects, latch, 1, concurrentAnalyzers, librariesPath);
+            ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectPath, libraries, projects, 1, librariesPath);
             projectAnalyzer.run();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
 
-        System.out.println(projects.peek().minimalStringRepresentation());
+        System.out.println(projects.get(0).minimalStringRepresentation());
     }
 
     static void analyzeMultipleProjects(String projectsPath, String librariesPath) {
@@ -140,48 +135,29 @@ public class Main {
             }
         });
 
-        ArrayBlockingQueue<Project> projects = new ArrayBlockingQueue<>(projectFolders.length);
-        CountDownLatch latch = new CountDownLatch(projectFolders.length);
+        List<Project> projects = new LinkedList<>();
 
-        Semaphore concurrentAnalyzers;
-        if (multithreaded) {
-            concurrentAnalyzers = new Semaphore(Runtime.getRuntime().availableProcessors());
-        } else {
-            concurrentAnalyzers = new Semaphore(1);
-        }
-
-        //ProjectAnalyzer projectAnalyzer;
         for (File projectFolder : projectFolders) {
             try {
-                concurrentAnalyzers.acquire();
-                //Thread thread = new Thread(new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concurrentAnalyzers, librariesPath));
-                //thread.start();
-                ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, latch, projectFolders.length, concurrentAnalyzers, librariesPath);
+                ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectFolder.getPath(), libraries, projects, projectFolders.length, librariesPath);
                 projectAnalyzer.run();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
         }
 
-        try {
-            latch.await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
         /*
         for (Project project : projects) {
             System.out.println("Project: " + project.minimalStringRepresentation());
-        }*/
+        }
+        */
 
         saveResults(projectsPath, projects);
 
         printStatistics(projects);
     }
 
-    static void saveResults(String path, ArrayBlockingQueue<Project> projects) {
+    static void saveResults(String path, List<Project> projects) {
         Map<String, BufferedWriter> writers = new HashMap<String, BufferedWriter>();
         for (String library : libraries.keySet()) {
             try {
@@ -227,7 +203,7 @@ public class Main {
         }
     }
 
-    private static void printStatistics(ArrayBlockingQueue<Project> projects) {
+    private static void printStatistics(List<Project> projects) {
         System.out.println("Projects analyzed: " + projects.size());
 
         HashMap<String, Integer> librariesOccurrences = new HashMap<>();
