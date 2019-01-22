@@ -5,10 +5,9 @@
 //  Copyright © 2018 Marc Tarnutzer. All rights reserved.
 //
 
-package com.marctarnutzer.jandrolyzer;
+package com.marctarnutzer.jandrolyzer.Models;
 
 import com.github.javaparser.ast.CompilationUnit;
-import com.marctarnutzer.jandrolyzer.Models.APIURL;
 
 import java.util.*;
 

@@ -11,7 +11,7 @@ import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.marctarnutzer.jandrolyzer.JSONDeserializer;
-import com.marctarnutzer.jandrolyzer.JSONRoot;
+import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
 import com.marctarnutzer.jandrolyzer.TypeEstimator;
 import com.marctarnutzer.jandrolyzer.Utils;
 

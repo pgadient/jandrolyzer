@@ -24,13 +24,14 @@ import com.github.javaparser.resolution.types.ResolvedReferenceType;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
+import com.marctarnutzer.jandrolyzer.Models.Project;
 
 import java.util.*;
 
 public class AssignmentLocator {
 
     /*
-     * Returns a list of possible values assigned to a nameExpr between its declaration and the nameExpr access
+     * Returns a list of possible nodes assigned to a nameExpr between its declaration and the nameExpr access
      * location in question
      */
     public static List<Node> nameExprGetLastAssignedNode(NameExpr nameExpr, Project project) {

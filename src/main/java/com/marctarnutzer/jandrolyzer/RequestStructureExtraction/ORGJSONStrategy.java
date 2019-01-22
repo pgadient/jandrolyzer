@@ -15,6 +15,9 @@ import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.marctarnutzer.jandrolyzer.*;
+import com.marctarnutzer.jandrolyzer.Models.JSONDataType;
+import com.marctarnutzer.jandrolyzer.Models.JSONObject;
+import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
 
 import java.util.Map;
 

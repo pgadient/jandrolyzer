@@ -5,7 +5,7 @@
 //  Copyright © 2018 Marc Tarnutzer. All rights reserved.
 //
 
-package com.marctarnutzer.jandrolyzer;
+package com.marctarnutzer.jandrolyzer.Models;
 
 public class Snippet {
 

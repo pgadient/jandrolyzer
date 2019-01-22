@@ -13,7 +13,7 @@ import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.marctarnutzer.jandrolyzer.Models.APIEndpoint;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
-import com.marctarnutzer.jandrolyzer.Project;
+import com.marctarnutzer.jandrolyzer.Models.Project;
 import okhttp3.HttpUrl;
 
 import java.util.*;

@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import com.marctarnutzer.jandrolyzer.Models.*;
 
 public class Main {
     // Scan APK file(s)

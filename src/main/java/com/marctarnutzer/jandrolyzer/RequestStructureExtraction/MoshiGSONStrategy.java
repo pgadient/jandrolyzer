@@ -23,6 +23,10 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.marctarnutzer.jandrolyzer.*;
+import com.marctarnutzer.jandrolyzer.Models.JSONDataType;
+import com.marctarnutzer.jandrolyzer.Models.JSONObject;
+import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
+import com.marctarnutzer.jandrolyzer.Models.Project;
 
 import java.util.Arrays;
 import java.util.HashSet;

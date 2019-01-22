@@ -20,6 +20,7 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.marctarnutzer.jandrolyzer.*;
+import com.marctarnutzer.jandrolyzer.Models.Project;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.JSONStringStrategy;
 import okhttp3.HttpUrl;
 

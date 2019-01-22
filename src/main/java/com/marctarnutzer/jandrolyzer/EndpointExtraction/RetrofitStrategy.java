@@ -22,7 +22,7 @@ import com.github.javaparser.resolution.types.ResolvedReferenceType;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserInterfaceDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.marctarnutzer.jandrolyzer.DeclarationLocator;
-import com.marctarnutzer.jandrolyzer.Project;
+import com.marctarnutzer.jandrolyzer.Models.Project;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.MoshiGSONStrategy;
 
 import java.util.LinkedList;

@@ -27,7 +27,7 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.github.javaparser.symbolsolver.reflectionmodel.ReflectionMethodDeclaration;
 import com.marctarnutzer.jandrolyzer.DeclarationLocator;
-import com.marctarnutzer.jandrolyzer.Project;
+import com.marctarnutzer.jandrolyzer.Models.Project;
 import com.marctarnutzer.jandrolyzer.Utils;
 
 import java.util.*;
