@@ -12,9 +12,11 @@ import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.marctarnutzer.jandrolyzer.JSONDeserializer;
 import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
+import com.marctarnutzer.jandrolyzer.Models.Project;
 import com.marctarnutzer.jandrolyzer.TypeEstimator;
 import com.marctarnutzer.jandrolyzer.Utils;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -22,12 +24,23 @@ public class JSONStringStrategy {
 
     private JSONDeserializer jsonDeserializer = new JSONDeserializer();
 
+    public boolean extract(List<String> potentialJSONStrings, Project project) {
+        boolean foundValidJSON = false;
+
+        for (String potentialJSONString : potentialJSONStrings) {
+            System.out.println("Checking for JSON: " + potentialJSONString);
+            foundValidJSON = parse(potentialJSONString, "noinfo", project.jsonModels) || foundValidJSON;
+        }
+
+        return foundValidJSON;
+    }
+
     /*
      * Parses a StringLiteralExpr for a valid JSON model
      * Returns boolean value whether valid JSON model was found or not
      */
     public boolean parse(StringLiteralExpr stringLiteralExpr, String path, Map<String, JSONRoot> jsonModels) {
-        return (parse(stringLiteralExpr.getValue(), path, jsonModels));
+        return parse(stringLiteralExpr.getValue(), path, jsonModels);
     }
 
     public boolean parse(String potJSONString, String path, Map<String, JSONRoot> jsonModels) {

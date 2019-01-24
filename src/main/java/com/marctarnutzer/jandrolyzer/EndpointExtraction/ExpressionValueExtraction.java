@@ -26,8 +26,10 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.github.javaparser.symbolsolver.reflectionmodel.ReflectionMethodDeclaration;
+import com.marctarnutzer.jandrolyzer.AssignmentLocator;
 import com.marctarnutzer.jandrolyzer.DeclarationLocator;
 import com.marctarnutzer.jandrolyzer.Models.Project;
+import com.marctarnutzer.jandrolyzer.TypeEstimator;
 import com.marctarnutzer.jandrolyzer.Utils;
 
 import java.util.*;
@@ -447,7 +449,225 @@ public class ExpressionValueExtraction {
         return toReturn;
     }
 
+    private static String solvedExpressionType(Expression expression) {
+        String estimatedType = TypeEstimator.estimateTypeName(expression);
+
+        System.out.println("Expression: " + expression.toString() + ", type: " + estimatedType);
+
+        if (estimatedType == null) {
+            return null;
+        }
+
+        switch (estimatedType) {
+            case "java.lang.String":
+                return "<STRING>";
+            case "java.lang.Double": case "java.lang.Float":
+                return "<DOUBLE";
+            case "java.lang.Integer":
+                return "<INTEGER>";
+            case "java.lang.Boolean":
+                return "<BOOLEAN>";
+            default:
+                return null;
+        }
+    }
+
+    private static boolean contains(Node compareNode, Node tempNode) {
+        if (compareNode.equals(tempNode)) {
+            return true;
+        }
+
+        boolean contains = false;
+        for (Node child : tempNode.getChildNodes()) {
+            contains = contains(compareNode, child) || contains;
+        }
+
+        return contains;
+    }
+
     public static List<String> getExpressionValue(Expression expression) {
+        System.out.println("Getting value of expression: " + expression);
+
+        if (expression.isNameExpr()) {
+            System.out.println("NameExpr found: " + expression);
+            List<Node> assignedNodes = AssignmentLocator.nameExprGetLastAssignedNode(expression.asNameExpr(), project);
+            List<String> toReturn = new LinkedList<>();
+            System.out.println("Assigned nodes to check: " + assignedNodes);
+
+            if (assignedNodes == null) {
+                String typeString = solvedExpressionType(expression.asNameExpr());
+                if (typeString != null) {
+                    return Arrays.asList(typeString);
+                } else {
+                    return null;
+                }
+            }
+
+            for (Node assignedNode : assignedNodes) {
+                if (assignedNode instanceof Expression) {
+                    if (assignedNode.containsWithin((Node) expression)) {
+                        System.out.println("Dont look at node itself");
+                        continue;
+                    }
+                    System.out.println("Assigned expression: " + assignedNode);
+                    List<String> toAdd = getExpressionValue((Expression) assignedNode);
+                    if (toAdd != null) {
+                        toReturn.addAll(toAdd);
+                    }
+                } else {
+                    System.out.println("Not an expression: " + assignedNode);
+                }
+            }
+
+            if (toReturn.isEmpty()) {
+                String typeString = solvedExpressionType(expression.asNameExpr());
+                if (typeString != null) {
+                    return Arrays.asList(typeString);
+                } else {
+                    return null;
+                }
+            } else {
+                return toReturn;
+            }
+        } else if (expression.isStringLiteralExpr()) {
+            return Arrays.asList(expression.asStringLiteralExpr().getValue());
+        } else if (expression.isIntegerLiteralExpr()) {
+            return Arrays.asList(expression.asIntegerLiteralExpr().getValue());
+        } else if (expression.isBooleanLiteralExpr()) {
+            return Arrays.asList(Boolean.toString(expression.asBooleanLiteralExpr().getValue()));
+        } else if (expression.isDoubleLiteralExpr()) {
+            return Arrays.asList(expression.asDoubleLiteralExpr().getValue());
+        } else if (expression.isLongLiteralExpr()) {
+            return Arrays.asList(expression.asLongLiteralExpr().getValue());
+        } else if (expression.isNullLiteralExpr()) {
+            return Arrays.asList("null");
+        } else if (expression.isBinaryExpr()) {
+            return serializeBinaryExpr(expression.asBinaryExpr());
+        } else if (expression.isMethodCallExpr()) {
+            System.out.println("MethodCallExpr found: " + expression);
+
+            if (expression.asMethodCallExpr().getName().asString().equals("concat")) {
+                return extractStringConcatValue(expression.asMethodCallExpr());
+            } else {
+                ResolvedMethodDeclaration resolvedMethodDeclaration = null;
+                try {
+                    resolvedMethodDeclaration = expression.asMethodCallExpr().resolve();
+                } catch (Exception e) {
+                    System.out.println("Error resolving MethodCallExpr: " + e);
+                }
+
+                System.out.println("Resolved MethodCallExpr: " + resolvedMethodDeclaration);
+
+                if (resolvedMethodDeclaration == null) {
+                    return null;
+                }
+
+                if (resolvedMethodDeclaration instanceof ReflectionMethodDeclaration) {
+                    System.out.println("Found ReflectionMethodDeclaration");
+
+                    String typeString = solvedExpressionType(expression.asMethodCallExpr());
+                    if (typeString != null) {
+                        return Arrays.asList(typeString);
+                    } else {
+                        return null;
+                    }
+                }
+
+                MethodDeclaration methodDeclaration = ((JavaParserMethodDeclaration) resolvedMethodDeclaration)
+                        .getWrappedNode();
+
+                methodDeclaration = DeclarationLocator.locate(methodDeclaration, MethodDeclaration.class);
+
+                List<ReturnStmt> returnStmts = methodDeclaration.findAll(ReturnStmt.class);
+                List<String> toReturn = new LinkedList<>();
+                for (ReturnStmt returnStmt : returnStmts) {
+                    System.out.println("Found return statement: " + returnStmt);
+
+                    List<String> returnExprResult = getExpressionValue(returnStmt.getExpression().get());
+
+                    if (returnExprResult == null) {
+                        continue;
+                    }
+
+                    toReturn.addAll(returnExprResult);
+                }
+
+                if (toReturn == null || toReturn.isEmpty()) {
+                    String typeString = solvedExpressionType(expression.asMethodCallExpr());
+                    if (typeString != null) {
+                        return Arrays.asList(typeString);
+                    } else {
+                        return null;
+                    }
+                }
+
+                return toReturn;
+            }
+        } else if (expression.isObjectCreationExpr()) {
+            if (expression.asObjectCreationExpr().getType().getName().asString().equals("URL")) {
+                return extractURLValue(expression.asObjectCreationExpr());
+            }
+        } else if (expression.isFieldAccessExpr()) {
+            System.out.println("Field expression found: " + expression);
+
+            ResolvedValueDeclaration resolvedValueDeclaration;
+            try {
+                resolvedValueDeclaration = expression.asFieldAccessExpr().resolve();
+            } catch (Exception e) {
+                System.out.println("Error resolving field access expression: " + e);
+                return null;
+            }
+
+            if (resolvedValueDeclaration instanceof JavaParserFieldDeclaration) {
+                Node declarationNode = ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode();
+
+                if (declarationNode instanceof FieldDeclaration) {
+                    VariableDeclarator variableDeclarator = null;
+                    for (VariableDeclarator vd : ((FieldDeclaration) declarationNode).getVariables()) {
+                        if (vd.getName().asString().equals(expression.asFieldAccessExpr().getName().asString())) {
+                            variableDeclarator = vd;
+                        }
+                    }
+
+                    if (variableDeclarator == null) {
+                        String typeString = solvedExpressionType(expression.asFieldAccessExpr());
+                        if (typeString != null) {
+                            return Arrays.asList(typeString);
+                        } else {
+                            return null;
+                        }
+                    }
+
+                    if (variableDeclarator.getInitializer().isPresent()) {
+                        return getExpressionValue(variableDeclarator.getInitializer().get());
+                    }
+                }
+            } else {
+                System.out.println("Not a JavaParserFieldDeclaration: " + resolvedValueDeclaration);
+            }
+
+            String typeString = solvedExpressionType(expression.asFieldAccessExpr());
+            if (typeString != null) {
+                return Arrays.asList(typeString);
+            } else {
+                return null;
+            }
+        } else {
+            System.out.println("NOT IMPLEMENTED: " + expression);
+
+            String typeString = solvedExpressionType(expression);
+            if (typeString != null) {
+                return Arrays.asList(typeString);
+            } else {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /*
+    public static List<String> getExpressionValue2(Expression expression) {
         System.out.println("Getting value of expression: " + expression);
 
         if (expression.isNameExpr()) {
@@ -465,19 +685,17 @@ public class ExpressionValueExtraction {
                 // TODO: Check if I even need this...
                 System.out.println("Found a variable");
             } else if (resolvedValueDeclaration.isField()) {
-                if (resolvedValueDeclaration.asField().getType().isReferenceType()) {
-                    if (resolvedValueDeclaration.asField().getType().asReferenceType().getQualifiedName()
-                            .equals("java.lang.String")) {
-                        Node declarationNode = ((JavaParserFieldDeclaration) resolvedValueDeclaration.asField())
-                                .getWrappedNode();
-                        if (((FieldDeclaration) declarationNode).asFieldDeclaration().getVariables().size() == 1) {
-                            VariableDeclarator variableDeclarator = ((FieldDeclaration) declarationNode)
-                                    .asFieldDeclaration().getVariables().get(0);
-                            if (variableDeclarator.getInitializer().isPresent()) {
-                                if (variableDeclarator.getInitializer().get().isStringLiteralExpr()) {
-                                    return Arrays.asList(variableDeclarator.getInitializer().get().asStringLiteralExpr().getValue());
-                                }
-                            }
+                Node declarationNode = ((JavaParserFieldDeclaration) resolvedValueDeclaration.asField())
+                        .getWrappedNode();
+
+                if (((FieldDeclaration) declarationNode).asFieldDeclaration().getVariables().size() == 1) {
+                    VariableDeclarator variableDeclarator = ((FieldDeclaration) declarationNode)
+                            .asFieldDeclaration().getVariables().get(0);
+                    if (variableDeclarator.getInitializer().isPresent()) {
+                        if (variableDeclarator.getInitializer().get().isStringLiteralExpr()) {
+                            return Arrays.asList(variableDeclarator.getInitializer().get().asStringLiteralExpr().getValue());
+                        } else {
+                            return getExpressionValue2(variableDeclarator.getInitializer().get());
                         }
                     }
                 }
@@ -542,7 +760,7 @@ public class ExpressionValueExtraction {
                         if (methodCallExprQSignature.equals(methodDeclarationQSignature)) {
                             System.out.println("Signatures match: " + methodCallExprQSignature
                                     + "parameter position: " + parameterPosition);
-                            List<String> expressionValues = getExpressionValue(methodCallExpr.getArgument(parameterPosition));
+                            List<String> expressionValues = getExpressionValue2(methodCallExpr.getArgument(parameterPosition));
                             if (expressionValues != null) {
                                 toReturn.addAll(expressionValues);
                             }
@@ -565,7 +783,7 @@ public class ExpressionValueExtraction {
                 Node declarationNode = ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode();
                 if (declarationNode instanceof VariableDeclarator) {
                     if (((VariableDeclarator) declarationNode).getInitializer().isPresent()) {
-                        return getExpressionValue(((VariableDeclarator) declarationNode).getInitializer().get());
+                        return getExpressionValue2(((VariableDeclarator) declarationNode).getInitializer().get());
                     }
                 }
             }
@@ -615,7 +833,7 @@ public class ExpressionValueExtraction {
                 for (ReturnStmt returnStmt : returnStmts) {
                     System.out.println("Found return statement: " + returnStmt);
 
-                    List<String> returnExprResult = getExpressionValue(returnStmt.getExpression().get());
+                    List<String> returnExprResult = getExpressionValue2(returnStmt.getExpression().get());
 
                     if (returnExprResult == null) {
                         continue;
@@ -661,7 +879,7 @@ public class ExpressionValueExtraction {
                     }
 
                     if (variableDeclarator.getInitializer().isPresent()) {
-                        return getExpressionValue(variableDeclarator.getInitializer().get());
+                        return getExpressionValue2(variableDeclarator.getInitializer().get());
                     }
                 }
             } else {
@@ -673,5 +891,6 @@ public class ExpressionValueExtraction {
 
         return null;
     }
+    */
 
 }

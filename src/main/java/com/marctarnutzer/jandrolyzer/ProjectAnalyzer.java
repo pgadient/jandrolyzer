@@ -28,6 +28,7 @@ import com.github.javaparser.utils.SourceRoot;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.APIURLStrategy;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.OkHttpStrategy;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.RetrofitStrategy;
+import com.marctarnutzer.jandrolyzer.EndpointExtraction.StringValueExtraction;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
 import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
 import com.marctarnutzer.jandrolyzer.Models.Project;
@@ -298,37 +299,70 @@ public class ProjectAnalyzer implements Runnable {
     }
 
     private void analyzeVariableDeclarator(Node node) {
-        // Check if a new StringBuilder object is created and check if it contains API endpoint information
-        boolean foundAPIURL = apiurlStrategy.extract((VariableDeclarator) node, this.project);
+        List<String> assembledStrings = StringValueExtraction.extract((VariableDeclarator) node, this.project);
 
-        if (foundAPIURL) {
+        if (assembledStrings == null) {
             return;
         }
 
+        boolean isValidURL = apiurlStrategy.extract(assembledStrings, this.project);
+
+        if (isValidURL) {
+            return;
+        }
+
+        boolean isValidJSON = jsonStringStrategy.extract(assembledStrings, this.project);
+
+        // Check if a new StringBuilder object is created and check if it contains API endpoint information
+        //boolean foundAPIURL = apiurlStrategy.extract((VariableDeclarator) node, this.project);
+        /*
+        if (foundAPIURL) {
+            return;
+        }
+        */
+
         // Check if a HttpUrl.Builder object is created and check if it contains API endpoint information
-        foundAPIURL = okHttpStrategy.extract((VariableDeclarator) node);
+        //foundAPIURL = okHttpStrategy.extract((VariableDeclarator) node);
     }
 
     private void analyzeStringLiteralExpr(Node node, String path) {
         // Check if StringLiteralExpr is a valid JSON model
         boolean foundJSONModel = jsonStringStrategy.parse((StringLiteralExpr) node, path, jsonModels);
+        /*
         if (foundJSONModel) {
             return;
         }
+        */
 
         // Check if StringLiteralExpr is a valid API URL
         boolean foundAPIURL = apiurlStrategy.extract(((StringLiteralExpr) node).getValue(), this.project, null);
     }
 
     private void analyzeBinaryExpr(Node node, String path) {
-        // Check if BinaryExpr is a valid JSON model
-        boolean foundJSONModel = jsonStringStrategy.parse((BinaryExpr) node, path, jsonModels);
-        if (foundJSONModel) {
+        List<String> assembledStrings = StringValueExtraction.extract((BinaryExpr) node, this.project);
+
+        if (assembledStrings == null) {
             return;
         }
 
+        boolean isValidURL = apiurlStrategy.extract(assembledStrings, this.project);
+
+        if (isValidURL) {
+            return;
+        }
+
+        boolean isValidJSON = jsonStringStrategy.extract(assembledStrings, this.project);
+
+        // Check if BinaryExpr is a valid JSON model
+        //boolean foundJSONModel = jsonStringStrategy.parse((BinaryExpr) node, path, jsonModels);
+        /*
+        if (foundJSONModel) {
+            return;
+        }
+        */
+
         //Check if BinaryExpr is a valid API URL
-        boolean foundAPIURL = apiurlStrategy.extract((BinaryExpr) node, this.project);
+        //boolean foundAPIURL = apiurlStrategy.extract((BinaryExpr) node, this.project);
     }
 
     private void analyzeObjectCreationExpr(Node node, String path, String name) {
@@ -469,7 +503,20 @@ public class ProjectAnalyzer implements Runnable {
                 moshiGsonStrategy.extract(node, path, jsonModels, combinedTypeSolver);
                 break;
             case "concat":
-                apiurlStrategy.extract((MethodCallExpr) node, this.project);
+                //apiurlStrategy.extract((MethodCallExpr) node, this.project);
+                List<String> assembledStrings = StringValueExtraction.extract((MethodCallExpr) node, this.project);
+
+                if (assembledStrings == null) {
+                    return;
+                }
+
+                boolean isValidURL = apiurlStrategy.extract(assembledStrings, this.project);
+
+                if (isValidURL) {
+                    return;
+                }
+
+                boolean isValidJSON = jsonStringStrategy.extract(assembledStrings, this.project);
                 break;
             case "build":
                 okHttpStrategy.extract((MethodCallExpr) node, null);

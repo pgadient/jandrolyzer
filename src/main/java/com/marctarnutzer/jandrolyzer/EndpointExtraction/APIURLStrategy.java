@@ -7,9 +7,6 @@
 
 package com.marctarnutzer.jandrolyzer.EndpointExtraction;
 
-import com.github.javaparser.ast.body.*;
-import com.github.javaparser.ast.expr.BinaryExpr;
-import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.marctarnutzer.jandrolyzer.Models.APIEndpoint;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
@@ -51,73 +48,15 @@ public class APIURLStrategy {
         return true;
     }
 
-    public boolean extract(BinaryExpr binaryExpr, Project project) {
-        if (!binaryExpr.getParentNode().isPresent() || binaryExpr.getParentNode().get() instanceof BinaryExpr) {
-            return false;
-        }
-
-        System.out.println("Found top level BinaryExpr: " + binaryExpr);
-
-        List<String> serializedBinaryExprs = ExpressionValueExtraction.serializeBinaryExpr(binaryExpr);
-
-        if (serializedBinaryExprs == null) {
-            return false;
-        }
-
+    public boolean extract(List<String> potentialURLs, Project project) {
         boolean foundValidURL = false;
 
-        for (String serializedBinaryExpr : serializedBinaryExprs) {
-            foundValidURL = extract(serializedBinaryExpr, project, null) || foundValidURL;
+        for (String potentialURL : potentialURLs) {
+            System.out.println("Checking for URL: " + potentialURL);
+            foundValidURL = extract(potentialURL, project, null) || foundValidURL;
         }
 
         return foundValidURL;
-    }
-
-    // Check if a new StringBuilder object is created and check if it contains API endpoint information
-    public boolean extract(VariableDeclarator variableDeclarator, Project project) {
-        if (variableDeclarator.getInitializer().isPresent() && variableDeclarator.getInitializer().get()
-                .isObjectCreationExpr()) {
-            if (variableDeclarator.getInitializer().get().asObjectCreationExpr().getType().getName().asString()
-                    .equals("StringBuilder")) {
-                /*
-                 * Check if the assembled StringBuilder strings contain valid API URLs
-                 */
-
-                List<String> potentialApiURLs = ExpressionValueExtraction.extractStringBuilderValue(variableDeclarator, project);
-
-                boolean foundAPIURL = false;
-                for (String potentialAPIURL : potentialApiURLs) {
-                    foundAPIURL = extract(potentialAPIURL, project, null) || foundAPIURL;
-                }
-
-                return foundAPIURL;
-            }
-        }
-
-        return false;
-    }
-
-    /*
-     * Extract API URLs from concatenated Strings using the concat() MethodCallExpr
-     */
-    public void extract(MethodCallExpr methodCallExpr, Project project) {
-        if (methodCallExpr.getParentNode().isPresent() && methodCallExpr.getParentNode().get() instanceof MethodCallExpr
-                && ((MethodCallExpr) methodCallExpr.getParentNode().get()).asMethodCallExpr().getName().asString()
-                .equals("concat")) {
-            return;
-        }
-
-        System.out.println("Detected rightmost concat method: " + methodCallExpr);
-
-        List<String> stringsToCheck = ExpressionValueExtraction.extractStringConcatValue(methodCallExpr);
-
-        if (stringsToCheck == null) {
-            return;
-        }
-
-        for (String stringToCheck : stringsToCheck) {
-            extract(stringToCheck, project, null);
-        }
     }
 
     /*
