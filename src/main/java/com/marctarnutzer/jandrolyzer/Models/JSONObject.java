@@ -112,9 +112,13 @@ public class JSONObject {
             stringBuilder.append("]");
         } else {
             if (value != null) {
-                stringBuilder.append("\"" + value.toString() + "\"");
+                if (this.jsonDataType == JSONDataType.STRING) {
+                    stringBuilder.append("\"" + value.toString() + "\"");
+                } else {
+                    stringBuilder.append(value.toString());
+                }
             } else {
-                stringBuilder.append("\"<" + this.jsonDataType + ">\"");
+                stringBuilder.append("null");
             }
         }
 

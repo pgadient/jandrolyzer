@@ -151,7 +151,7 @@ public class ProjectAnalyzer implements Runnable {
 
                     // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
-                        if (name.equals("OkHttpTesting.java")) {
+                        if (name.equals("ORGJSONExtractionTesting.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -299,10 +299,17 @@ public class ProjectAnalyzer implements Runnable {
     }
 
     private void analyzeVariableDeclarator(Node node) {
-        List<String> assembledStrings = StringValueExtraction.extract((VariableDeclarator) node, this.project);
+        List<String> assembledStrings = new LinkedList<>();
+        List<String> assembledStringsSV = StringValueExtraction.extract((VariableDeclarator) node, this.project);
 
-        if (assembledStrings == null) {
-            return;
+        if (assembledStringsSV != null) {
+            assembledStrings = assembledStringsSV;
+        }
+
+        List<String> assembledJSONStrings = orgjsonStrategy.extract((VariableDeclarator) node, this.project);
+
+        if (assembledJSONStrings != null) {
+            assembledStrings.addAll(assembledJSONStrings);
         }
 
         boolean isValidURL = apiurlStrategy.extract(assembledStrings, this.project);
@@ -497,7 +504,7 @@ public class ProjectAnalyzer implements Runnable {
                 // Too few examples to test (only 3 of the F Droid projects use async but in combination with ION)
                 break;
             case "put":
-                orgjsonStrategy.extract(node, path, jsonModels);
+                //orgjsonStrategy.extract(node, path, jsonModels);
                 break;
             case "addProperty": case "toJson": case "adapter":
                 moshiGsonStrategy.extract(node, path, jsonModels, combinedTypeSolver);

@@ -25,6 +25,7 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
+import com.github.javaparser.symbolsolver.reflectionmodel.ReflectionFieldDeclaration;
 import com.github.javaparser.symbolsolver.reflectionmodel.ReflectionMethodDeclaration;
 import com.marctarnutzer.jandrolyzer.AssignmentLocator;
 import com.marctarnutzer.jandrolyzer.DeclarationLocator;
@@ -641,6 +642,11 @@ public class ExpressionValueExtraction {
                     if (variableDeclarator.getInitializer().isPresent()) {
                         return getExpressionValue(variableDeclarator.getInitializer().get());
                     }
+                }
+            } else if (resolvedValueDeclaration instanceof ReflectionFieldDeclaration) {
+                System.out.println("ReflectionFieldDeclaration found: " + resolvedValueDeclaration);
+                if (resolvedValueDeclaration.getName().equals("NULL")) {
+                    return Arrays.asList("NULL");
                 }
             } else {
                 System.out.println("Not a JavaParserFieldDeclaration: " + resolvedValueDeclaration);

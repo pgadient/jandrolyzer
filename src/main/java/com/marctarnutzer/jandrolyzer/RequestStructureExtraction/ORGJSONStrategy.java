@@ -7,170 +7,500 @@
 
 package com.marctarnutzer.jandrolyzer.RequestStructureExtraction;
 
+import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.stmt.ReturnStmt;
+import com.github.javaparser.ast.stmt.Statement;
 import com.github.javaparser.ast.type.PrimitiveType;
+import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserMethodDeclaration;
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserParameterDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.marctarnutzer.jandrolyzer.*;
+import com.marctarnutzer.jandrolyzer.EndpointExtraction.ExpressionValueExtraction;
 import com.marctarnutzer.jandrolyzer.Models.JSONDataType;
 import com.marctarnutzer.jandrolyzer.Models.JSONObject;
 import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
+import com.marctarnutzer.jandrolyzer.Models.Project;
+import sun.awt.image.ImageWatched;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 public class ORGJSONStrategy {
 
-    private String methodOrConstructor;
-    private String classOrInterface;
-    private String scopeName;
-    private String keyString;
-    private String valueType;
-    private Object valueObject;
+    private Project project;
 
-    // Extract org.json relevant information from node
-    public void extract(Node node, String path, Map<String, JSONRoot> jsonModels) {
-        methodOrConstructor = null;
-        classOrInterface = null;
-        scopeName = null;
-        keyString = null;
-        valueObject = null;
-        valueObject = null;
+    public List<String> extract(VariableDeclarator variableDeclarator, Project project) {
+        this.project = project;
 
-        if (node instanceof MethodCallExpr) {
-            Expression scopeExpr = ((MethodCallExpr) node).getScope().orElse(null);
-            if (scopeExpr != null) {
-                String estimatedType = TypeEstimator.estimateTypeName(scopeExpr);
+        if (variableDeclarator.getType().isClassOrInterfaceType() && variableDeclarator.getType()
+                .asClassOrInterfaceType().getName().asString().equals("JSONObject")) {
+            System.out.println("Found JSONObject VariableDeclarator: " + variableDeclarator);
 
-                if (estimatedType != null && (estimatedType.equals("JSONObject") ||
-                        estimatedType.equals("org.json.JSONObject"))) {
-                    System.out.println("Found type: " + estimatedType + " for expression: " + scopeExpr.toString());
-                    System.out.println("Path: " + path);
+            List<String> initStrings = new LinkedList<>();
+            if (variableDeclarator.getInitializer().isPresent()
+                    && variableDeclarator.getInitializer().get().isObjectCreationExpr()
+                    && variableDeclarator.getInitializer().get().asObjectCreationExpr().getArguments().size() == 1) {
+                Expression arg = variableDeclarator.getInitializer().get().asObjectCreationExpr().getArgument(0);
+                String typeString = TypeEstimator.estimateTypeName(arg);
 
-                    scopeName = scopeExpr.toString();
+                if (typeString != null && typeString.equals("java.lang.String")) {
+                    List<String> preStrings = ExpressionValueExtraction.getExpressionValue(arg);
 
-                    // Get method and class name from declaration if possible
-                    if (scopeExpr instanceof NameExpr) {
-                        try {
-                            ResolvedValueDeclaration resolvedValueDeclaration= ((NameExpr)scopeExpr).resolve();
-                            Node declarationNode = ((JavaParserSymbolDeclaration)resolvedValueDeclaration).getWrappedNode();
-                            fillMethodAndClassInfo(declarationNode);
-                        } catch (Exception e) {
-                            System.out.println("Exception: " + e);
+                    if (preStrings != null && !preStrings.isEmpty()) {
+                        for (String preString : preStrings) {
+                            preString = Utils.removeEscapeSequencesFrom(preString);
+                            try {
+                                org.json.JSONObject jsonObject = new org.json.JSONObject(preString);
+                                initStrings.add(jsonObject.toString());
+                            } catch (Exception e) {
+                                System.out.println("Error while initializing new JSONObject: " + e);
+                            }
                         }
                     }
+                }
+            } else if (variableDeclarator.getInitializer().isPresent()
+                    && variableDeclarator.getInitializer().get().isMethodCallExpr()) {
+                MethodCallExpr methodCallExpr = variableDeclarator.getInitializer().get().asMethodCallExpr();
 
-                    if (methodOrConstructor == null && classOrInterface == null) {
-                        fillMethodAndClassInfo(node);
+                List<List<String>> jsonStringLists = new LinkedList<>();
+                jsonStringLists.add(new LinkedList<>());
+                getValuesFromMethodCallExpr(methodCallExpr, jsonStringLists);
+
+                for (List<String> stringList : jsonStringLists) {
+                    initStrings.addAll(stringList);
+                }
+            }
+
+            System.out.println("Init strings: " + initStrings);
+
+            Node containingNode = Utils.getParentClassOrMethod(variableDeclarator);
+
+            List<String> toCheck = new LinkedList<>();
+            if (containingNode instanceof MethodDeclaration) {
+                List<List<String>> jsonStringLists = new LinkedList<>();
+                jsonStringLists.add(initStrings);
+                extractJSONStringsFromMethod(containingNode, variableDeclarator, jsonStringLists);
+                for (List<String> jsonStringList : jsonStringLists) {
+                    toCheck.addAll(jsonStringList);
+                }
+            } else if (containingNode instanceof ClassOrInterfaceDeclaration) {
+                System.out.println("Searching methods for JSONObject field: " + variableDeclarator);
+
+                if (variableDeclarator.getParentNode().isPresent()
+                        && variableDeclarator.getParentNode().get() instanceof FieldDeclaration) {
+                    Node fieldNode = variableDeclarator.getParentNode().get();
+
+                    List<MethodDeclaration> methodDeclarations = new LinkedList<>();
+                    if (((FieldDeclaration) fieldNode).isPublic()) {
+                        for (CompilationUnit cu : project.compilationUnits) {
+                            methodDeclarations.addAll(cu.findAll(MethodDeclaration.class));
+                        }
+                    } else {
+                        methodDeclarations = containingNode.findAll(MethodDeclaration.class);
                     }
 
-                    NodeList<Expression> arguments = ((MethodCallExpr) node).getArguments();
-                    if (arguments.size() == 2) {
-                        if (arguments.get(0) instanceof StringLiteralExpr) {
-                            System.out.println("Found string literal expression: " + ((StringLiteralExpr)arguments.get(0)).asString());
-                            keyString = ((StringLiteralExpr)arguments.get(0)).asString();
+                    for (MethodDeclaration methodDeclaration : methodDeclarations) {
+                        List<List<String>> jsonStringLists = new LinkedList<>();
+                        jsonStringLists.add(initStrings);
+                        extractJSONStringsFromMethod(methodDeclaration, fieldNode, jsonStringLists);
 
-                            if (arguments.get(1) instanceof NameExpr) {
-                                System.out.println("Found name expression: " + ((NameExpr)arguments.get(1)).getName());
-                                String argumentType = TypeEstimator.estimateTypeName(arguments.get(1));
-                                System.out.println("Argument type: " + argumentType);
+                        for (List<String> jsonStringList : jsonStringLists) {
+                            toCheck.addAll(jsonStringList);
+                        }
+                    }
+                }
+            }
 
-                                System.out.println("Parent: " + arguments.get(1).getParentNodeForChildren().getClass());
+            System.out.println("org.json strings to check: " + toCheck);
 
-                                if (arguments.get(1).getParentNodeForChildren() instanceof PrimitiveType) {
-                                    System.out.println("Its a primitive type");
+            return toCheck;
+        }
+
+        return null;
+    }
+
+    private void extractJSONStringsFromMethod(Node node, Node variableDeclarationNode,
+                                              List<List<String>> jsonStringLists) {
+        if (node instanceof MethodCallExpr) {
+            MethodCallExpr methodCallExpr = ((MethodCallExpr) node);
+            if (methodCallExpr.getNameAsString().equals("put") && methodCallExpr.getArguments().size() == 2) {
+                System.out.println("Put methodCallExpr detected: " + methodCallExpr);
+
+                Node nonMCEScope = getScope(methodCallExpr);
+                if (nonMCEScope != null && nonMCEScope instanceof NameExpr) {
+                    NameExpr nameExpr = (NameExpr) nonMCEScope;
+                    try {
+                        ResolvedValueDeclaration resolvedValueDeclaration = nameExpr.resolve();
+
+                        System.out.println("ResolvedValueDeclaration: " + resolvedValueDeclaration);
+
+                        if (((resolvedValueDeclaration instanceof JavaParserSymbolDeclaration)
+                                && ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
+                                .equals(variableDeclarationNode))
+                                || ((resolvedValueDeclaration instanceof JavaParserFieldDeclaration)
+                                && ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode()
+                                .equals(variableDeclarationNode))
+                                || ((resolvedValueDeclaration instanceof JavaParserParameterDeclaration)
+                                && ((JavaParserParameterDeclaration) resolvedValueDeclaration).getWrappedNode()
+                                .equals(variableDeclarationNode))) {
+                            System.out.println("Found valid put() MethodCallExpr: " + resolvedValueDeclaration);
+
+                            List<String> arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0));
+                            List<String> arg2Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1));
+
+                            System.out.println("Arg1Values: " + arg1Values + ", arg2Values: " + arg2Values);
+
+                            String typeString = TypeEstimator.estimateTypeName(methodCallExpr.getArgument(1));
+
+                            List<String> toAdd = new LinkedList<>();
+                            if (jsonStringLists.get(jsonStringLists.size() - 1).isEmpty()) {
+                                for (String arg1Value : arg1Values) {
+                                    for (String arg2Value : arg2Values) {
+                                        try {
+                                            org.json.JSONObject jsonObject = new org.json.JSONObject();
+
+                                            if (typeString != null) {
+                                                insertKeyValuePair(arg1Value, arg2Value, jsonObject, typeString);
+                                            } else {
+                                                jsonObject.put(arg1Value, arg2Value);
+                                            }
+
+                                            toAdd.add(jsonObject.toString());
+                                        } catch (Exception e) {
+                                            System.out.println("JSON error: " + e);
+                                            continue;
+                                        }
+                                    }
+                                }
+                            } else {
+                                for (String preString : jsonStringLists.get(jsonStringLists.size() - 1)) {
+                                    for (String arg1Value : arg1Values) {
+                                        for (String arg2Value : arg2Values) {
+                                            try {
+                                                System.out.println("PreString: " + preString);
+                                                org.json.JSONObject jsonObject = new org.json.JSONObject(preString);
+
+                                                if (typeString != null) {
+                                                    insertKeyValuePair(arg1Value, arg2Value, jsonObject, typeString);
+                                                } else {
+                                                    jsonObject.put(arg1Value, arg2Value);
+                                                }
+
+                                                System.out.println("Adding: " + jsonObject.toString());
+
+                                                toAdd.add(jsonObject.toString());
+                                            } catch (Exception e) {
+                                                System.out.println("JSON error: " + e);
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            System.out.println("toAdd: " + toAdd);
+
+                            jsonStringLists.get(jsonStringLists.size() - 1).clear();
+                            jsonStringLists.get(jsonStringLists.size() - 1).addAll(toAdd);
+                            //org.json.JSONObject jsonObject = jsonObjects.get(jsonObjects.size() - 1);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Error resolving NameExpr: " + e);
+                    }
+                }
+            } else if (methodCallExpr.getArguments().size() > 0) {
+                int position = -1;
+                for (Expression arg : methodCallExpr.getArguments()) {
+                    position++;
+                    if (variableDeclarationNode instanceof VariableDeclarator) {
+                        if (arg.isNameExpr() && arg.asNameExpr().getName().asString()
+                                .equals(((VariableDeclarator)variableDeclarationNode).getName().asString())) {
+                            System.out.println("NameExpr possibly used as argument: " + methodCallExpr);
+                            ResolvedValueDeclaration resolvedValueDeclaration;
+                            try {
+                                resolvedValueDeclaration = arg.asNameExpr().resolve();
+                            } catch (Exception e) {
+                                System.out.println("Error resolving argument of MCE: " + e);
+                                continue;
+                            }
+
+                            if (((resolvedValueDeclaration instanceof JavaParserSymbolDeclaration)
+                                    && ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
+                                    .equals(variableDeclarationNode))
+                                    || ((resolvedValueDeclaration instanceof JavaParserFieldDeclaration)
+                                    && ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode()
+                                    .equals(variableDeclarationNode))
+                                    || ((resolvedValueDeclaration instanceof JavaParserParameterDeclaration)
+                                    && ((JavaParserParameterDeclaration) resolvedValueDeclaration).getWrappedNode()
+                                    .equals(variableDeclarationNode))) {
+                                System.out.println("Found MCE with nameExpr as argument: " + methodCallExpr);
+
+                                ResolvedMethodDeclaration resolvedMethodDeclaration;
+                                try {
+                                    resolvedMethodDeclaration = methodCallExpr.resolve();
+                                } catch (Exception e) {
+                                    System.out.println("Error resolving MCE: " + e);
+                                    continue;
                                 }
 
-                                valueType = argumentType;
+                                if (resolvedMethodDeclaration == null) {
+                                    continue;
+                                }
 
-                            } else if (arguments.get(1) instanceof IntegerLiteralExpr) {
-                                Integer found = ((IntegerLiteralExpr)arguments.get(1)).asInt();
-                                valueObject = found;
-                            } else if (arguments.get(1) instanceof StringLiteralExpr) {
-                                String found = ((StringLiteralExpr)arguments.get(1)).asString();
-                                valueObject = found;
-                            } else if (arguments.get(1) instanceof CharLiteralExpr) {
-                                String found = String.valueOf(((CharLiteralExpr)arguments.get(1)).asChar());
-                                valueObject = found;
-                            } else if (arguments.get(1) instanceof BooleanLiteralExpr) {
-                                Boolean found = ((BooleanLiteralExpr)arguments.get(1)).getValue();
-                                valueObject = found;
-                            }
-                            // As of right now DoubleLiteralExpr represents both doubles and floats
-                            // (waiting for JavaParser update...)
-                            else if (arguments.get(1) instanceof DoubleLiteralExpr) {
-                                Double found = ((DoubleLiteralExpr)arguments.get(1)).asDouble();
-                                valueObject = found;
-                            }
-                            /*
-                            else if (arguments.get(1) instanceof LongLiteralExpr) {
-                                Double found = (double)((LongLiteralExpr)arguments.get(1)).asLong();
-                                valueObject = found;
-                            }
-                             */
-                            else if (arguments.get(1) instanceof NullLiteralExpr) {
-                                valueType = "NULL";
-                            } else {
-                                // TODO: Add option to allow unknown expressions or just add in as string? let's see...
-                                System.out.println("Not an accepted expression: " + arguments.get(1).toString()
-                                    + ", class: " + arguments.get(1).getClass());
-                                String argumentType = TypeEstimator.estimateTypeName(arguments.get(1));
-                                System.out.println("Estimated type: " + argumentType);
-                                return;
-                            }
+                                MethodDeclaration methodDeclaration =
+                                        ((JavaParserMethodDeclaration) resolvedMethodDeclaration).getWrappedNode();
+                                methodDeclaration = DeclarationLocator.locate(methodDeclaration, MethodDeclaration.class);
 
-                            addToJSONMap(path, jsonModels);
+                                if (methodDeclaration == null) {
+                                    continue;
+                                }
+
+                                System.out.println("Found MethodDeclaration: " + methodDeclaration);
+
+                                extractJSONStringsFromMethod(methodDeclaration,
+                                        methodDeclaration.getParameter(position), jsonStringLists);
+                            }
                         }
                     }
-                } else {
-                    //System.out.println("Type did not match, type: " + estimatedType + " for expression: "
-                    //        + scopeExpr.toString());
                 }
             }
+        } else if (node instanceof AssignExpr) {
+            System.out.println("Assign expr detected: " + node);
+
+            Expression value = ((AssignExpr) node).getValue();
+            Expression target = ((AssignExpr) node).getTarget();
+            if (target.isNameExpr() && ((value.isObjectCreationExpr()
+                    && value.asObjectCreationExpr().getType().isClassOrInterfaceType()
+                    && value.asObjectCreationExpr().getType().asClassOrInterfaceType().getName().asString()
+                    .equals("JSONObject")) || value.isMethodCallExpr())) {
+                try {
+                    ResolvedValueDeclaration resolvedValueDeclaration = target.asNameExpr().resolve();
+                    if (((resolvedValueDeclaration instanceof JavaParserSymbolDeclaration)
+                            && ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
+                            .equals(variableDeclarationNode))
+                            || ((resolvedValueDeclaration instanceof JavaParserFieldDeclaration)
+                            && ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode()
+                            .equals(variableDeclarationNode))
+                            || ((resolvedValueDeclaration instanceof JavaParserParameterDeclaration)
+                            && ((JavaParserParameterDeclaration) resolvedValueDeclaration).getWrappedNode()
+                            .equals(variableDeclarationNode))) {
+                        System.out.println("Assign operation to NameExpr detected: " + node);
+
+                        if (value.isObjectCreationExpr()) {
+                            if (!jsonStringLists.get(jsonStringLists.size() - 1).isEmpty()) {
+                                jsonStringLists.add(new LinkedList<>());
+                            }
+
+                            List<String> prevStrings = new LinkedList<>();
+                            for (List<String> prevStringList : jsonStringLists) {
+                                prevStrings.addAll(prevStringList);
+                            }
+                            jsonStringLists.get(jsonStringLists.size() - 1).addAll(prevStrings);
+
+                            if (value.asObjectCreationExpr().getArguments().size() == 1) {
+                                Expression arg = value.asObjectCreationExpr().getArgument(0);
+                                String typeString = TypeEstimator.estimateTypeName(arg);
+
+                                if (typeString != null && typeString.equals("java.lang.String")) {
+                                    List<String> preValues = ExpressionValueExtraction.getExpressionValue(arg);
+
+                                    if (preValues != null && !preValues.isEmpty()) {
+                                        for (String preValue : preValues) {
+                                            preValue = Utils.removeEscapeSequencesFrom(preValue);
+                                            System.out.println("Preval: " + preValue);
+                                            try {
+                                                org.json.JSONObject jsonObject = new org.json.JSONObject(preValue);
+                                                System.out.println("ToAdd: " + jsonObject.toString());
+                                                jsonStringLists.get(jsonStringLists.size() - 1).add(jsonObject.toString());
+                                            } catch (Exception e) {
+                                                System.out.println("Exception initializing new JSONObject: " + e);
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            System.out.println("Initialized new list: " + jsonStringLists.get(jsonStringLists.size() - 1));
+                        } else if (value.isMethodCallExpr()) {
+                            System.out.println("Its a mce");
+
+                            if (!jsonStringLists.get(jsonStringLists.size() - 1).isEmpty()) {
+                                jsonStringLists.add(new LinkedList<>());
+                            }
+
+                            List<String> prevStrings = new LinkedList<>();
+                            for (List<String> prevStringList : jsonStringLists) {
+                                prevStrings.addAll(prevStringList);
+                            }
+                            jsonStringLists.get(jsonStringLists.size() - 1).addAll(prevStrings);
+
+                            getValuesFromMethodCallExpr((MethodCallExpr) value, jsonStringLists);
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("Error resolving NameExpr: " + e);
+                }
+            }
+        } else if (node instanceof Statement && ((Statement) node).isReturnStmt()
+                && ((Statement) node).asReturnStmt().getExpression().isPresent()
+                && ((Statement) node).asReturnStmt().getExpression().get().isNameExpr()) {
+            System.out.println("Found nameExpr return statement: " + node);
+            ResolvedValueDeclaration resolvedValueDeclaration;
+            try {
+                resolvedValueDeclaration = ((Statement) node).asReturnStmt().getExpression().get().asNameExpr().resolve();
+                if (((resolvedValueDeclaration instanceof JavaParserSymbolDeclaration)
+                        && ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode()
+                        .equals(variableDeclarationNode))
+                        || ((resolvedValueDeclaration instanceof JavaParserFieldDeclaration)
+                        && ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode()
+                        .equals(variableDeclarationNode))
+                        || ((resolvedValueDeclaration instanceof JavaParserParameterDeclaration)
+                        && ((JavaParserParameterDeclaration) resolvedValueDeclaration).getWrappedNode()
+                        .equals(variableDeclarationNode))) {
+                    System.out.println("Found matching nameExpr as return statement: " + node);
+
+                    if (!jsonStringLists.get(jsonStringLists.size() - 1).isEmpty()) {
+                        jsonStringLists.add(new LinkedList<>());
+                    }
+
+                    List<String> prevStrings = new LinkedList<>();
+                    for (List<String> prevStringList : jsonStringLists) {
+                        prevStrings.addAll(prevStringList);
+                    }
+                    jsonStringLists.get(jsonStringLists.size() - 1).addAll(prevStrings);
+                }
+            } catch (Exception e) {
+                System.out.println("Error resolving return stmt: " + e);
+            }
+        }
+
+        for (Node child : node.getChildNodes()) {
+            extractJSONStringsFromMethod(child, variableDeclarationNode, jsonStringLists);
         }
     }
 
-    private void addToJSONMap(String path, Map<String, JSONRoot> jsonModels) {
-        JSONRoot jsonRoot = new JSONRoot(path, classOrInterface, methodOrConstructor, scopeName);
-        if (jsonModels.containsKey(jsonRoot.getIdentifier())) {
-            System.out.println("JSON object already exists, id: " + jsonRoot.getIdentifier());
-            JSONObject jsonObject = new JSONObject(null, valueObject, valueType);
-            jsonModels.get(jsonRoot.getIdentifier()).jsonObject.linkedHashMap.put(keyString, jsonObject);
-        } else {
-            System.out.println("Creating new JSON object...");
-            jsonRoot.jsonObject = new JSONObject(JSONDataType.OBJECT, null, null);
-            JSONObject toInsert = new JSONObject(null, valueObject, valueType);
-            jsonRoot.jsonObject.linkedHashMap.put(keyString, toInsert);
-            jsonModels.put(jsonRoot.getIdentifier(), jsonRoot);
+    private void getValuesFromMethodCallExpr(MethodCallExpr methodCallExpr, List<List<String>> jsonStringLists) {
+        try {
+            ResolvedMethodDeclaration resolvedMethodDeclaration = methodCallExpr.asMethodCallExpr().resolve();
+
+            MethodDeclaration methodDeclaration =
+                    ((JavaParserMethodDeclaration) resolvedMethodDeclaration).getWrappedNode();
+            methodDeclaration = DeclarationLocator.locate(methodDeclaration, MethodDeclaration.class);
+
+            if (methodDeclaration != null) {
+                System.out.println("Found methodDeclaration: " + methodDeclaration);
+
+                List<ReturnStmt> returnStatements = methodDeclaration.findAll(ReturnStmt.class);
+                Node declarationNode = null;
+                for (ReturnStmt returnStmt : returnStatements) {
+                    if (!(returnStmt.getExpression().isPresent()
+                            && returnStmt.getExpression().get().isNameExpr())) {
+                        continue;
+                    }
+
+                    try {
+                        ResolvedValueDeclaration rvd =
+                                returnStmt.getExpression().get().asNameExpr().resolve();
+
+                        if (!(rvd.getType().isReferenceType() && rvd.getType().asReferenceType()
+                                .getQualifiedName().equals("org.json.JSONObject"))) {
+                            continue;
+                        }
+
+                        System.out.println("ResolvedValueDeclaration: " + rvd);
+
+                        if (rvd instanceof JavaParserSymbolDeclaration) {
+                            System.out.println("Its a JavaParserSymbolDeclaration");
+                            declarationNode = ((JavaParserSymbolDeclaration) rvd).getWrappedNode();
+                            break;
+                        } else if (rvd instanceof JavaParserFieldDeclaration) {
+                            System.out.println("Its a JavaParserFieldDeclaration");
+                            declarationNode = ((JavaParserSymbolDeclaration) rvd).getWrappedNode();
+                            break;
+                        } else if (rvd instanceof JavaParserParameterDeclaration) {
+                            System.out.println("Its a JavaParserParameterDeclaration");
+                            declarationNode = ((JavaParserSymbolDeclaration) rvd).getWrappedNode();
+                            break;
+                        }
+
+                    } catch (Exception e) {
+                        System.out.println("Error resolving nameExpr: " + e);
+                    }
+                }
+
+                if (declarationNode != null) {
+                    System.out.println("Extracting: " + declarationNode);
+
+                    if (declarationNode instanceof VariableDeclarator) {
+                        System.out.println("DeclarationNode is VariableDeclarator");
+
+                        List<String> methodStrings = extract((VariableDeclarator) declarationNode, project);
+
+                        if (methodStrings != null && !methodStrings.isEmpty()) {
+                            System.out.println("Adding methodStrings");
+
+                            jsonStringLists.get(jsonStringLists.size() - 1).addAll(methodStrings);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error resolving MCE: " + e);
         }
-
-        jsonRoot.library = "org.json";
-
-        System.out.println("Added to JSONMap");
     }
 
-    private void fillMethodAndClassInfo(Node node) {
-        Node parentNode = Utils.getParentClassOrMethod(node);
-        if (parentNode instanceof MethodDeclaration || parentNode instanceof ConstructorDeclaration) {
-            Node grandparentNode = Utils.getParentClassOrMethod(parentNode);
-            if (grandparentNode instanceof ClassOrInterfaceDeclaration) {
-                if (parentNode instanceof MethodDeclaration) {
-                    methodOrConstructor = ((MethodDeclaration)parentNode).getName().asString();
+    private void insertKeyValuePair(String arg1Value, String arg2Value, org.json.JSONObject jsonObject, String typeString) {
+        switch (typeString) {
+            case "java.lang.String":
+                if (arg2Value.toLowerCase().equals("null")) {
+                    jsonObject.put(arg1Value, org.json.JSONObject.NULL);
                 } else {
-                    methodOrConstructor = ((ConstructorDeclaration)parentNode).getName().asString();
+                    jsonObject.put(arg1Value, arg2Value);
                 }
-                classOrInterface = ((ClassOrInterfaceDeclaration) grandparentNode).getName().asString();
+                break;
+            case "java.lang.Double":
+                Double d = Double.valueOf(arg2Value);
+                jsonObject.put(arg1Value, d);
+                break;
+            case "java.lang.Float":
+                Float f = Float.valueOf(arg2Value);
+                jsonObject.put(arg1Value, f);
+                break;
+            case "java.lang.Integer":
+                Integer i = Integer.valueOf(arg2Value);
+                jsonObject.put(arg1Value, i);
+                break;
+            case "java.lang.Boolean":
+                Boolean b = Boolean.valueOf(arg2Value);
+                jsonObject.put(arg1Value, b);
+                break;
+            default:
+                if (arg2Value != null && arg2Value.toLowerCase().equals("null")) {
+                    jsonObject.put(arg1Value, org.json.JSONObject.NULL);
+                } else {
+                    jsonObject.put(arg1Value, arg2Value);
+                }
+        }
+    }
 
-                System.out.println("Found method/constructor: " + methodOrConstructor +
-                        " and class/interface: " + classOrInterface);
-            }
-        } else if (parentNode instanceof ClassOrInterfaceDeclaration) {
-            System.out.println("Found only class/interface: " + ((ClassOrInterfaceDeclaration) parentNode).getName().asString());
-            classOrInterface = ((ClassOrInterfaceDeclaration) parentNode).getName().asString();
+    private Node getScope(MethodCallExpr methodCallExpr) {
+        if (!methodCallExpr.getScope().isPresent()) {
+            return null;
+        }
+
+        if (methodCallExpr.getScope().get().isMethodCallExpr()) {
+            return getScope(methodCallExpr.getScope().get().asMethodCallExpr());
         } else {
-            System.out.println("No info about node found");
+            return methodCallExpr.getScope().get();
         }
     }
 }
