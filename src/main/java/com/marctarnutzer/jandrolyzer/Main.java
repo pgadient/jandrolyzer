@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import com.marctarnutzer.jandrolyzer.APIAnalysis.APIAnalyzer;
 import com.marctarnutzer.jandrolyzer.Models.*;
 
 public class Main {
@@ -124,6 +125,9 @@ public class Main {
         }
 
         System.out.println(projects.get(0).minimalStringRepresentation());
+
+        APIAnalyzer apiAnalyzer = new APIAnalyzer(projects);
+        apiAnalyzer.analyzeAll();
     }
 
     static void analyzeMultipleProjects(String projectsPath, String librariesPath) {
