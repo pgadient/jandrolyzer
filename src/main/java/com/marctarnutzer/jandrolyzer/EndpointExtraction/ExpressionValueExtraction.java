@@ -331,7 +331,7 @@ public class ExpressionValueExtraction {
                 }
 
                 List<String> appendValues = getExpressionValue(methodCallExpr.getArguments().get(0));
-                if (appendValues.isEmpty()) {
+                if (appendValues == null || appendValues.isEmpty()) {
                     continue;
                 }
 
@@ -578,6 +578,10 @@ public class ExpressionValueExtraction {
                         .getWrappedNode();
 
                 methodDeclaration = DeclarationLocator.locate(methodDeclaration, MethodDeclaration.class);
+
+                if (methodDeclaration == null) {
+                    return null;
+                }
 
                 List<ReturnStmt> returnStmts = methodDeclaration.findAll(ReturnStmt.class);
                 List<String> toReturn = new LinkedList<>();
