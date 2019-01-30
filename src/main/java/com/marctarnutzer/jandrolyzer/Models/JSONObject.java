@@ -118,7 +118,11 @@ public class JSONObject {
                     stringBuilder.append(value.toString());
                 }
             } else {
-                stringBuilder.append("null");
+                if (jsonDataType.equals(JSONDataType.NULL)) {
+                    stringBuilder.append("null");
+                } else {
+                    stringBuilder.append("\"<" + jsonDataType + ">\"");
+                }
             }
         }
 

@@ -273,6 +273,8 @@ public class AssignmentLocator {
                 Expression argExpr = methodCallExpr.getArgument(parameterPosition);
                 if (argExpr.isNameExpr()) {
                     lastAssignedNodes.addAll(nameExprGetLastAssignedNode(argExpr.asNameExpr(), project));
+                } else if (argExpr.isLiteralExpr()) {
+                    lastAssignedNodes.add(argExpr.asLiteralExpr());
                 }
             }
         }

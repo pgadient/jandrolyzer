@@ -22,6 +22,7 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.marctarnutzer.jandrolyzer.*;
 import com.marctarnutzer.jandrolyzer.Models.Project;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.JSONStringStrategy;
+import javassist.expr.MethodCall;
 import okhttp3.HttpUrl;
 
 import java.nio.file.Path;
@@ -247,28 +248,55 @@ public class OkHttpStrategy {
             if (argument.isNameExpr()) {
                 String estimatedType = TypeEstimator.estimateTypeName(argument.asNameExpr());
 
+                System.out.println("Estimated type: " + estimatedType);
+
                 if (estimatedType == null) {
                     return null;
                 }
 
-                if (!(estimatedType.equals("okhttp3.HttpUrl") || estimatedType.equals("okhttp.HttpUrl"))) {
-                    return null;
-                }
-
-                List<Node> assignedNodes= AssignmentLocator.nameExprGetLastAssignedNode(argument.asNameExpr(), project);
-                if (assignedNodes == null) {
-                    return null;
-                }
-
-                for (Node assignedNode : assignedNodes) {
-                    System.out.println("Assigned node found: " + assignedNode + ", class: " + assignedNode.getClass());
-
-                    if (!(assignedNode instanceof MethodCallExpr)) {
-                        continue;
+                if (estimatedType.equals("okhttp3.HttpUrl") || estimatedType.equals("okhttp.HttpUrl")) {
+                    List<Node> assignedNodes= AssignmentLocator.nameExprGetLastAssignedNode(argument.asNameExpr(), project);
+                    if (assignedNodes == null) {
+                        return null;
                     }
 
-                    extract((MethodCallExpr) assignedNode, httpMethod);
+                    for (Node assignedNode : assignedNodes) {
+                        System.out.println("Assigned node found: " + assignedNode + ", class: " + assignedNode.getClass());
+
+                        if (!(assignedNode instanceof MethodCallExpr)) {
+                            continue;
+                        }
+
+                        extract((MethodCallExpr) assignedNode, httpMethod);
+                    }
                 }
+                /*
+                else if (estimatedType.equals("java.lang.String")) {
+                    List<Node> assignedNodes = AssignmentLocator.nameExprGetLastAssignedNode(argument.asNameExpr(), project);
+                    if (assignedNodes == null) {
+                        return null;
+                    }
+
+                    for (Node assignedNode : assignedNodes) {
+                        System.out.println("Assigned node found: " + assignedNode + ", class: " + assignedNode.getClass());
+
+                        if (!(assignedNode instanceof MethodCallExpr)) {
+                            continue;
+                        }
+
+                        MethodCallExpr methodCallExpr1 = ((MethodCallExpr) assignedNode);
+
+                        if (methodCallExpr1.getScope().isPresent() && methodCallExpr1.getScope().get().isMethodCallExpr()
+                                && methodCallExpr1.getScope().get().asMethodCallExpr().getName().asString().equals("build")
+                                && methodCallExpr1.getScope().get().asMethodCallExpr().getScope().isPresent()
+                                && methodCallExpr1.getScope().get().asMethodCallExpr().getScope().get().isNameExpr()) {
+                            NameExpr builderNameExpr = methodCallExpr1.getScope().get().asMethodCallExpr().getScope().get().asNameExpr();
+
+
+                        }
+                    }
+                }
+                */
             }
 
             if (methodCallExpr.getScope().get().isMethodCallExpr()) {

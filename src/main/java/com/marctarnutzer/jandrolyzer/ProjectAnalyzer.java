@@ -299,6 +299,12 @@ public class ProjectAnalyzer implements Runnable {
     }
 
     private void analyzeVariableDeclarator(Node node) {
+        boolean foundAPIURL = okHttpStrategy.extract((VariableDeclarator) node);
+
+        if (foundAPIURL) {
+            return;
+        }
+
         List<String> assembledStrings = new LinkedList<>();
         List<String> assembledStringsSV = StringValueExtraction.extract((VariableDeclarator) node, this.project);
 

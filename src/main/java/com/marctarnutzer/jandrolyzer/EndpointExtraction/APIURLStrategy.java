@@ -149,6 +149,9 @@ public class APIURLStrategy {
     private void extractEndpoint(String endpointString, APIURL apiurl, String httpMethod) {
         String[] urlParts = endpointString.split("(\\?|#)");
 
+        System.out.println("Looking at endpointString: " + endpointString);
+        System.out.println("urlParts: " + urlParts);
+
         if (urlParts.length == 0) {
             return;
         }
