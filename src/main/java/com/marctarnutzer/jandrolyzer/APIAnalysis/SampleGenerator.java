@@ -68,9 +68,12 @@ public class SampleGenerator {
 
                     System.out.println("Most similar to key: " + key + " is value: " + entry.getKey()
                             + ", similarity: " + entry.getValue());
-                    System.out.println("Adding value: " + project.stringVariables.get(entry.getKey()).iterator().next());
+                    String escapedValue = org.json.JSONObject.quote(project.stringVariables.get(entry.getKey())
+                            .iterator().next());
+                    escapedValue = escapedValue.substring(1, escapedValue.length() - 1);
+                    System.out.println("Adding value: " + escapedValue);
 
-                    jsonObject.value = project.stringVariables.get(entry.getKey()).iterator().next();
+                    jsonObject.value = escapedValue;
                     break;
                 case BOOLEAN:
                     jsonObject.value = true;
