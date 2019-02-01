@@ -25,6 +25,7 @@ import com.github.javaparser.symbolsolver.utils.SymbolSolverCollectionStrategy;
 import com.github.javaparser.utils.ParserCollectionStrategy;
 import com.github.javaparser.utils.ProjectRoot;
 import com.github.javaparser.utils.SourceRoot;
+import com.marctarnutzer.jandrolyzer.APIAnalysis.VariableCollector;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.APIURLStrategy;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.OkHttpStrategy;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.RetrofitStrategy;
@@ -299,6 +300,8 @@ public class ProjectAnalyzer implements Runnable {
     }
 
     private void analyzeVariableDeclarator(Node node) {
+        VariableCollector.collect((VariableDeclarator) node, project);
+
         boolean foundAPIURL = okHttpStrategy.extract((VariableDeclarator) node);
 
         if (foundAPIURL) {

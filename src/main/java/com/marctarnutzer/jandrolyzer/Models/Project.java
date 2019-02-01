@@ -10,7 +10,6 @@ package com.marctarnutzer.jandrolyzer.Models;
 import com.github.javaparser.ast.CompilationUnit;
 
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Project {
@@ -23,6 +22,7 @@ public class Project {
     public Map<String, APIURL> apiURLs = new HashMap<>();
     public List<CompilationUnit> compilationUnits = new LinkedList<>();
     public ConcurrentLinkedQueue<RequestResponse> requestResponses = new ConcurrentLinkedQueue<>();
+    public Map<String, Set<String>> stringVariables = new HashMap<>();
 
     public Project(String path, String name) {
         this.path = path;

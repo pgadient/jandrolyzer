@@ -7,10 +7,7 @@
 
 package com.marctarnutzer.jandrolyzer.APIAnalysis;
 
-import com.marctarnutzer.jandrolyzer.Models.APIEndpoint;
-import com.marctarnutzer.jandrolyzer.Models.APIURL;
-import com.marctarnutzer.jandrolyzer.Models.Project;
-import com.marctarnutzer.jandrolyzer.Models.RequestResponse;
+import com.marctarnutzer.jandrolyzer.Models.*;
 import okhttp3.*;
 
 import java.io.IOException;
@@ -75,7 +72,19 @@ public class APIAnalyzer {
                     if (httpMethod.equals("GET")) {
                         System.out.println("Testing URL: " + httpUrl + " [" + httpMethod + "]");
 
-                        makeRequest(httpUrl, null, httpMethod, project.requestResponses, latch);
+                        //makeRequest(httpUrl, null, httpMethod, project.requestResponses, latch);
+                    } else if (httpMethod.equals("POST")) {
+                        System.out.println("Testing URL: " + httpUrl + " [" + httpMethod + "]");
+
+                        //makeRequest(httpUrl, null, httpMethod, project.requestResponses, latch);
+
+                        for (JSONRoot jsonRoot : project.jsonModels.values()) {
+                            String jsonString = SampleGenerator.populateJSON(jsonRoot, project);
+
+                            System.out.println("Making request with JSON: " + jsonString);
+
+                            //makeRequest(httpUrl, jsonString, httpMethod, project.requestResponses, latch);
+                        }
                     } else {
                         System.out.println("Blocked testing of URL: " + httpUrl + " [" + httpMethod + "]");
                     }
