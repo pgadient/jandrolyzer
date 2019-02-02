@@ -651,6 +651,15 @@ public class ExpressionValueExtraction {
                 System.out.println("ReflectionFieldDeclaration found: " + resolvedValueDeclaration);
                 if (resolvedValueDeclaration.getName().equals("NULL")) {
                     return Arrays.asList("NULL");
+                } else if (resolvedValueDeclaration.asField().getType().isReferenceType() &&
+                        resolvedValueDeclaration.asField().getType().asReferenceType().getQualifiedName()
+                                .equals("java.lang.Boolean")) {
+                    System.out.println("Reflect: " + resolvedValueDeclaration.getName());
+                    if (resolvedValueDeclaration.getName().equals("TRUE")) {
+                        return Arrays.asList("TRUE");
+                    } else {
+                        return Arrays.asList("FALSE");
+                    }
                 }
             } else {
                 System.out.println("Not a JavaParserFieldDeclaration: " + resolvedValueDeclaration);

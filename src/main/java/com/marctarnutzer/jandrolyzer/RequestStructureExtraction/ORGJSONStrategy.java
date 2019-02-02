@@ -23,15 +23,12 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.marctarnutzer.jandrolyzer.*;
 import com.marctarnutzer.jandrolyzer.EndpointExtraction.ExpressionValueExtraction;
-import com.marctarnutzer.jandrolyzer.Models.JSONDataType;
-import com.marctarnutzer.jandrolyzer.Models.JSONObject;
-import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
 import com.marctarnutzer.jandrolyzer.Models.Project;
-import sun.awt.image.ImageWatched;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 public class ORGJSONStrategy {
 
@@ -40,9 +37,17 @@ public class ORGJSONStrategy {
     public List<String> extract(VariableDeclarator variableDeclarator, Project project) {
         this.project = project;
 
-        if (variableDeclarator.getType().isClassOrInterfaceType() && variableDeclarator.getType()
-                .asClassOrInterfaceType().getName().asString().equals("JSONObject")) {
-            System.out.println("Found JSONObject VariableDeclarator: " + variableDeclarator);
+        if (variableDeclarator.getType().isClassOrInterfaceType()) {
+            String objectKind = null;
+            if (variableDeclarator.getType().asClassOrInterfaceType().getName().asString().equals("JSONObject")) {
+                System.out.println("Found JSONObject VariableDeclarator: " + variableDeclarator);
+                objectKind = "JSONObject";
+            } else if (variableDeclarator.getType().asClassOrInterfaceType().getName().asString().equals("JSONArray")) {
+                System.out.println("Found JSONArray VariableDeclarator: " + variableDeclarator);
+                objectKind = "JSONArray";
+            } else {
+                return null;
+            }
 
             List<String> initStrings = new LinkedList<>();
             if (variableDeclarator.getInitializer().isPresent()
@@ -58,8 +63,13 @@ public class ORGJSONStrategy {
                         for (String preString : preStrings) {
                             preString = Utils.removeEscapeSequencesFrom(preString);
                             try {
-                                org.json.JSONObject jsonObject = new org.json.JSONObject(preString);
-                                initStrings.add(jsonObject.toString());
+                                if (objectKind.equals("JSONObject")) {
+                                    org.json.JSONObject jsonObject = new org.json.JSONObject(preString);
+                                    initStrings.add(jsonObject.toString());
+                                } else {
+                                    org.json.JSONArray jsonArray = new org.json.JSONArray(preString);
+                                    initStrings.add(jsonArray.toString());
+                                }
                             } catch (Exception e) {
                                 System.out.println("Error while initializing new JSONObject: " + e);
                             }
@@ -87,12 +97,12 @@ public class ORGJSONStrategy {
             if (containingNode instanceof MethodDeclaration) {
                 List<List<String>> jsonStringLists = new LinkedList<>();
                 jsonStringLists.add(initStrings);
-                extractJSONStringsFromMethod(containingNode, variableDeclarator, jsonStringLists);
+                extractJSONStringsFromMethod(containingNode, variableDeclarator, jsonStringLists, objectKind);
                 for (List<String> jsonStringList : jsonStringLists) {
                     toCheck.addAll(jsonStringList);
                 }
             } else if (containingNode instanceof ClassOrInterfaceDeclaration) {
-                System.out.println("Searching methods for JSONObject field: " + variableDeclarator);
+                System.out.println("Searching methods for JSONObject/JSONArray field: " + variableDeclarator);
 
                 if (variableDeclarator.getParentNode().isPresent()
                         && variableDeclarator.getParentNode().get() instanceof FieldDeclaration) {
@@ -110,7 +120,7 @@ public class ORGJSONStrategy {
                     for (MethodDeclaration methodDeclaration : methodDeclarations) {
                         List<List<String>> jsonStringLists = new LinkedList<>();
                         jsonStringLists.add(initStrings);
-                        extractJSONStringsFromMethod(methodDeclaration, fieldNode, jsonStringLists);
+                        extractJSONStringsFromMethod(methodDeclaration, fieldNode, jsonStringLists, objectKind);
 
                         for (List<String> jsonStringList : jsonStringLists) {
                             toCheck.addAll(jsonStringList);
@@ -128,10 +138,11 @@ public class ORGJSONStrategy {
     }
 
     private void extractJSONStringsFromMethod(Node node, Node variableDeclarationNode,
-                                              List<List<String>> jsonStringLists) {
+                                              List<List<String>> jsonStringLists, String objectKind) {
         if (node instanceof MethodCallExpr) {
             MethodCallExpr methodCallExpr = ((MethodCallExpr) node);
-            if (methodCallExpr.getNameAsString().equals("put") && methodCallExpr.getArguments().size() == 2) {
+            if (methodCallExpr.getNameAsString().equals("put") && methodCallExpr.getArguments().size() == 1
+                    || methodCallExpr.getNameAsString().equals("put") && methodCallExpr.getArguments().size() == 2) {
                 System.out.println("Put methodCallExpr detected: " + methodCallExpr);
 
                 Node nonMCEScope = getScope(methodCallExpr);
@@ -153,27 +164,106 @@ public class ORGJSONStrategy {
                                 .equals(variableDeclarationNode))) {
                             System.out.println("Found valid put() MethodCallExpr: " + resolvedValueDeclaration);
 
-                            List<String> arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0));
-                            List<String> arg2Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1));
+                            List<String> arg1Values;
+                            List<String> arg2Values = null;
+                            String argKind = null;
+                            if (objectKind.equals("JSONObject")) {
+                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0));
+                                arg2Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1));
+
+                                if (arg2Values == null) {
+                                    if (methodCallExpr.getArgument(1).isNameExpr()) {
+                                        NameExpr argNameExpr = methodCallExpr.getArgument(1).asNameExpr();
+                                        List<String> preStrings = new LinkedList<>();
+                                        getValuesFromNameExpr(argNameExpr, preStrings);
+                                        if (!preStrings.isEmpty()) {
+                                            arg2Values = preStrings;
+                                            if (preStrings.get(0).startsWith("{")) {
+                                                argKind = "JSONObject";
+                                            } else {
+                                                argKind = "JSONArray";
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0));
+
+                                if (arg1Values == null) {
+                                    if (methodCallExpr.getArgument(0).isNameExpr()) {
+                                        NameExpr argNameExpr = methodCallExpr.getArgument(0).asNameExpr();
+                                        List<String> preStrings = new LinkedList<>();
+                                        getValuesFromNameExpr(argNameExpr, preStrings);
+                                        if (!preStrings.isEmpty()) {
+                                            arg1Values = preStrings;
+                                            if (preStrings.get(0).startsWith("{")) {
+                                                argKind = "JSONObject";
+                                            } else {
+                                                argKind = "JSONArray";
+                                            }
+                                        }
+                                    }
+                                }
+                            }
 
                             System.out.println("Arg1Values: " + arg1Values + ", arg2Values: " + arg2Values);
 
-                            String typeString = TypeEstimator.estimateTypeName(methodCallExpr.getArgument(1));
+                            String typeString;
+                            if (arg2Values != null) {
+                                typeString = TypeEstimator.estimateTypeName(methodCallExpr.getArgument(1));
+                            } else {
+                                typeString = TypeEstimator.estimateTypeName(methodCallExpr.getArgument(0));
+                            }
 
                             List<String> toAdd = new LinkedList<>();
                             if (jsonStringLists.get(jsonStringLists.size() - 1).isEmpty()) {
-                                for (String arg1Value : arg1Values) {
-                                    for (String arg2Value : arg2Values) {
-                                        try {
-                                            org.json.JSONObject jsonObject = new org.json.JSONObject();
+                                if (objectKind.equals("JSONObject")) {
+                                    for (String arg1Value : arg1Values) {
+                                        for (String arg2Value : arg2Values) {
+                                            try {
+                                                org.json.JSONObject jsonObject = new org.json.JSONObject();
 
-                                            if (typeString != null) {
-                                                insertKeyValuePair(arg1Value, arg2Value, jsonObject, typeString);
+                                                if (argKind != null) {
+                                                    if (argKind.equals("JSONObject")) {
+                                                        JSONObject toInsert = new JSONObject(arg2Value);
+                                                        jsonObject.put(arg1Value, toInsert);
+                                                    } else {
+                                                        JSONArray toInsert = new JSONArray(arg2Value);
+                                                        jsonObject.put(arg1Value, toInsert);
+                                                    }
+                                                } else if (typeString != null) {
+                                                    insertKeyValuePair(arg1Value, arg2Value, jsonObject, typeString);
+                                                } else {
+                                                    jsonObject.put(arg1Value, arg2Value);
+                                                }
+
+                                                toAdd.add(jsonObject.toString());
+                                            } catch (Exception e) {
+                                                System.out.println("JSON error: " + e);
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    for (String arg1Value : arg1Values) {
+                                        try {
+                                            JSONArray jsonArray = new JSONArray();
+
+                                            if (argKind != null) {
+                                                if (argKind.equals("JSONObject")) {
+                                                    JSONObject toInsert = new JSONObject(arg1Value);
+                                                    jsonArray.put(toInsert);
+                                                } else {
+                                                    JSONArray toInsert = new JSONArray(arg1Value);
+                                                    jsonArray.put(toInsert);
+                                                }
+                                            } else if (typeString != null) {
+                                                insertJSONArrayValue(arg1Value, jsonArray, typeString);
                                             } else {
-                                                jsonObject.put(arg1Value, arg2Value);
+                                                jsonArray.put(arg1Value);
                                             }
 
-                                            toAdd.add(jsonObject.toString());
+                                            toAdd.add(jsonArray.toString());
                                         } catch (Exception e) {
                                             System.out.println("JSON error: " + e);
                                             continue;
@@ -181,22 +271,62 @@ public class ORGJSONStrategy {
                                     }
                                 }
                             } else {
-                                for (String preString : jsonStringLists.get(jsonStringLists.size() - 1)) {
-                                    for (String arg1Value : arg1Values) {
-                                        for (String arg2Value : arg2Values) {
+                                if (objectKind.equals("JSONObject")) {
+                                    for (String preString : jsonStringLists.get(jsonStringLists.size() - 1)) {
+                                        for (String arg1Value : arg1Values) {
+                                            for (String arg2Value : arg2Values) {
+                                                try {
+                                                    System.out.println("PreString: " + preString);
+                                                    org.json.JSONObject jsonObject = new org.json.JSONObject(preString);
+
+                                                    if (argKind != null) {
+                                                        if (argKind.equals("JSONObject")) {
+                                                            JSONObject toInsert = new JSONObject(arg2Value);
+                                                            jsonObject.put(arg1Value, toInsert);
+                                                        } else {
+                                                            JSONArray toInsert = new JSONArray(arg2Value);
+                                                            jsonObject.put(arg1Value, toInsert);
+                                                        }
+                                                    } else if (typeString != null) {
+                                                        insertKeyValuePair(arg1Value, arg2Value, jsonObject, typeString);
+                                                    } else {
+                                                        jsonObject.put(arg1Value, arg2Value);
+                                                    }
+
+                                                    System.out.println("Adding: " + jsonObject.toString());
+
+                                                    toAdd.add(jsonObject.toString());
+                                                } catch (Exception e) {
+                                                    System.out.println("JSON error: " + e);
+                                                    continue;
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    for (String preString : jsonStringLists.get(jsonStringLists.size() - 1)) {
+                                        for (String arg1Value : arg1Values) {
                                             try {
                                                 System.out.println("PreString: " + preString);
-                                                org.json.JSONObject jsonObject = new org.json.JSONObject(preString);
+                                                JSONArray jsonArray = new JSONArray(preString);
 
-                                                if (typeString != null) {
-                                                    insertKeyValuePair(arg1Value, arg2Value, jsonObject, typeString);
+                                                if (argKind != null) {
+                                                    if (argKind.equals("JSONObject")) {
+                                                        JSONObject toInsert = new JSONObject(arg1Value);
+                                                        jsonArray.put(toInsert);
+                                                    } else {
+                                                        JSONArray toInsert = new JSONArray(arg1Value);
+                                                        jsonArray.put(toInsert);
+                                                    }
+                                                } else if (typeString != null) {
+                                                    insertJSONArrayValue(arg1Value, jsonArray, typeString);
                                                 } else {
-                                                    jsonObject.put(arg1Value, arg2Value);
+                                                    jsonArray.put(arg1Value);
                                                 }
 
-                                                System.out.println("Adding: " + jsonObject.toString());
+                                                System.out.println("Adding: " + jsonArray.toString());
 
-                                                toAdd.add(jsonObject.toString());
+                                                toAdd.add(jsonArray.toString());
                                             } catch (Exception e) {
                                                 System.out.println("JSON error: " + e);
                                                 continue;
@@ -266,7 +396,7 @@ public class ORGJSONStrategy {
                                 System.out.println("Found MethodDeclaration: " + methodDeclaration);
 
                                 extractJSONStringsFromMethod(methodDeclaration,
-                                        methodDeclaration.getParameter(position), jsonStringLists);
+                                        methodDeclaration.getParameter(position), jsonStringLists, objectKind);
                             }
                         }
                     }
@@ -384,7 +514,40 @@ public class ORGJSONStrategy {
         }
 
         for (Node child : node.getChildNodes()) {
-            extractJSONStringsFromMethod(child, variableDeclarationNode, jsonStringLists);
+            extractJSONStringsFromMethod(child, variableDeclarationNode, jsonStringLists, objectKind);
+        }
+    }
+
+    private void getValuesFromNameExpr(NameExpr nameExpr, List<String> jsonStringList) {
+        try {
+            ResolvedValueDeclaration resolvedValueDeclaration = nameExpr.resolve();
+            if (resolvedValueDeclaration.getType().isReferenceType()) {
+                if (resolvedValueDeclaration.getType().asReferenceType().getQualifiedName().equals("org.json.JSONArray")
+                        || resolvedValueDeclaration.getType().asReferenceType().getQualifiedName().equals("org.json.JSONObject")) {
+                    System.out.println("JSONObject / JSONArray as value");
+                    Node declarationNode = null;
+                    if (resolvedValueDeclaration instanceof JavaParserSymbolDeclaration) {
+                        declarationNode = ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode();
+                    } else if (resolvedValueDeclaration instanceof JavaParserFieldDeclaration) {
+                        declarationNode = ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode();
+                    } else if (resolvedValueDeclaration instanceof JavaParserParameterDeclaration) {
+                        declarationNode = ((JavaParserParameterDeclaration) resolvedValueDeclaration).getWrappedNode();
+                    }
+
+                    if (declarationNode == null || !(declarationNode instanceof VariableDeclarator)) {
+                        return;
+                    }
+
+                    List<String> preStrings = extract((VariableDeclarator) declarationNode, project);
+
+                    if (preStrings != null && !preStrings.isEmpty()) {
+                        System.out.println("JSONArray / JSONObject strings: " + preStrings);
+                        jsonStringList.addAll(preStrings);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error resolving NameExpr: " + e);
         }
     }
 
@@ -488,6 +651,40 @@ public class ORGJSONStrategy {
                     jsonObject.put(arg1Value, org.json.JSONObject.NULL);
                 } else {
                     jsonObject.put(arg1Value, arg2Value);
+                }
+        }
+    }
+
+    private void insertJSONArrayValue(String arg1Value, org.json.JSONArray jsonArray, String typeString) {
+        switch (typeString) {
+            case "java.lang.String":
+                if (arg1Value.toLowerCase().equals("null")) {
+                    jsonArray.put(JSONObject.NULL);
+                } else {
+                    jsonArray.put(arg1Value);
+                }
+                break;
+            case "java.lang.Double":
+                Double d = Double.valueOf(arg1Value);
+                jsonArray.put(d);
+                break;
+            case "java.lang.Float":
+                Float f = Float.valueOf(arg1Value);
+                jsonArray.put(f);
+                break;
+            case "java.lang.Integer":
+                Integer i = Integer.valueOf(arg1Value);
+                jsonArray.put(i);
+                break;
+            case "java.lang.Boolean":
+                Boolean b = Boolean.valueOf(arg1Value);
+                jsonArray.put(b);
+                break;
+            default:
+                if (arg1Value != null && arg1Value.toLowerCase().equals("null")) {
+                    jsonArray.put(org.json.JSONObject.NULL);
+                } else {
+                    jsonArray.put(arg1Value);
                 }
         }
     }
