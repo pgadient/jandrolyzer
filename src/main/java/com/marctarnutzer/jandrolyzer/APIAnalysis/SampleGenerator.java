@@ -7,11 +7,9 @@
 
 package com.marctarnutzer.jandrolyzer.APIAnalysis;
 
-import com.marctarnutzer.jandrolyzer.Models.JSONDataType;
-import com.marctarnutzer.jandrolyzer.Models.JSONObject;
-import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
-import com.marctarnutzer.jandrolyzer.Models.Project;
+import com.marctarnutzer.jandrolyzer.Models.*;
 import info.debatty.java.stringsimilarity.JaroWinkler;
+import okhttp3.HttpUrl;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -20,6 +18,56 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class SampleGenerator {
+
+    public static String populateURLPart(String urlPart) {
+        urlPart = urlPart.replaceAll("<String>", "A");
+        urlPart = urlPart.replaceAll("<Double>", "0.0");
+        urlPart = urlPart.replaceAll("<Float>", "0.0");
+        urlPart = urlPart.replaceAll("<Integer>", "0");
+        urlPart = urlPart.replaceAll("<Boolean>", "true");
+        urlPart = urlPart.replaceAll("<STRING>", "A");
+        urlPart = urlPart.replaceAll("<DOUBLE>", "0.0");
+        urlPart = urlPart.replaceAll("<FLOAT>", "0.0");
+        urlPart = urlPart.replaceAll("<INTEGER>", "0");
+        urlPart = urlPart.replaceAll("<BOOLEAN>", "true");
+
+        return urlPart;
+    }
+
+    public static void populateQueryValues(APIURL apiurl, Project project) {
+        JaroWinkler jaroWinkler = new JaroWinkler();
+        Map<String, Double> variableSimilarities = new HashMap<>();
+
+        variableSimilaritiesInit(variableSimilarities, project);
+
+        for (APIEndpoint apiEndpoint : apiurl.endpoints.values()) {
+            for (Map.Entry<String, String> query : apiEndpoint.queries.entrySet()) {
+                if (query.getValue().equals("<String>") || query.getValue().equals("<STRING>")) {
+                    for (Map.Entry<String, Double> vs : variableSimilarities.entrySet()) {
+                        variableSimilarities.put(vs.getKey(), jaroWinkler.similarity(query.getKey(), vs.getKey()));
+                    }
+                    Map<String, Double> similaritiesSorted = variableSimilarities.entrySet()
+                            .stream().sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (v1, v2) -> v2,
+                                    LinkedHashMap::new));
+                    Map.Entry<String, Double> entry = similaritiesSorted.entrySet().iterator().next();
+
+                    System.out.println("Most similar to key: " + query.getKey() + " is value: " + entry.getKey()
+                            + ", similarity: " + entry.getValue());
+
+                    String escapedValue = org.json.JSONObject.quote(project.stringVariables.get(entry.getKey())
+                            .iterator().next());
+                    escapedValue = escapedValue.substring(1, escapedValue.length() - 1);
+
+                    System.out.println("Adding value: " + escapedValue);
+
+                    apiEndpoint.queries.put(query.getKey(), escapedValue);
+                } else {
+                    apiEndpoint.queries.put(query.getKey(), populateURLPart(query.getValue()));
+                }
+            }
+        }
+    }
 
     public static String populateJSON(JSONRoot jsonRoot, Project project) {
         JaroWinkler jaroWinkler = new JaroWinkler();

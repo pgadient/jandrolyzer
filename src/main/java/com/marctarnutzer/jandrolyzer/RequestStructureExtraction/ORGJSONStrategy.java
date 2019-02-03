@@ -9,12 +9,10 @@ package com.marctarnutzer.jandrolyzer.RequestStructureExtraction;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
-import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.*;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.ast.stmt.Statement;
-import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration;
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserFieldDeclaration;
@@ -410,7 +408,7 @@ public class ORGJSONStrategy {
             if (target.isNameExpr() && ((value.isObjectCreationExpr()
                     && value.asObjectCreationExpr().getType().isClassOrInterfaceType()
                     && value.asObjectCreationExpr().getType().asClassOrInterfaceType().getName().asString()
-                    .equals("JSONObject")) || value.isMethodCallExpr())) {
+                    .equals(objectKind)) || value.isMethodCallExpr())) {
                 try {
                     ResolvedValueDeclaration resolvedValueDeclaration = target.asNameExpr().resolve();
                     if (((resolvedValueDeclaration instanceof JavaParserSymbolDeclaration)
@@ -447,11 +445,17 @@ public class ORGJSONStrategy {
                                             preValue = Utils.removeEscapeSequencesFrom(preValue);
                                             System.out.println("Preval: " + preValue);
                                             try {
-                                                org.json.JSONObject jsonObject = new org.json.JSONObject(preValue);
-                                                System.out.println("ToAdd: " + jsonObject.toString());
-                                                jsonStringLists.get(jsonStringLists.size() - 1).add(jsonObject.toString());
+                                                if (objectKind.equals("JSONObject")) {
+                                                    org.json.JSONObject jsonObject = new org.json.JSONObject(preValue);
+                                                    System.out.println("ToAdd: " + jsonObject.toString());
+                                                    jsonStringLists.get(jsonStringLists.size() - 1).add(jsonObject.toString());
+                                                } else {
+                                                    org.json.JSONArray jsonArray = new org.json.JSONArray(preValue);
+                                                    System.out.println("ToAdd: " + jsonArray.toString());
+                                                    jsonStringLists.get(jsonStringLists.size() - 1).add(jsonArray.toString());
+                                                }
                                             } catch (Exception e) {
-                                                System.out.println("Exception initializing new JSONObject: " + e);
+                                                System.out.println("Exception initializing new JSONObject/JSONArray: " + e);
                                                 continue;
                                             }
                                         }

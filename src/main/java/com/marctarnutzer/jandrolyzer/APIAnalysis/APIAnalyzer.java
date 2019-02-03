@@ -55,15 +55,22 @@ public class APIAnalyzer {
         CountDownLatch latch = new CountDownLatch(requestsCount);
 
         for (APIURL apiurl : project.apiURLs.values()) {
+
+            SampleGenerator.populateQueryValues(apiurl, project);
+
             String baseURL = apiurl.getBaseURL();
             for (APIEndpoint apiEndpoint : apiurl.endpoints.values()) {
                 HttpUrl.Builder urlBuilder = HttpUrl.parse(baseURL).newBuilder();
-                urlBuilder.addEncodedPathSegments(apiEndpoint.path);
+                String path = SampleGenerator.populateURLPart(apiEndpoint.path);
+                urlBuilder.addEncodedPathSegments(path);
                 for (Map.Entry<String, String> query : apiEndpoint.queries.entrySet()) {
-                    urlBuilder.addEncodedQueryParameter(query.getKey(), query.getValue());
+                    String queryKey = SampleGenerator.populateURLPart(query.getKey());
+                    String queryValue = SampleGenerator.populateURLPart(query.getValue());
+                    urlBuilder.addEncodedQueryParameter(queryKey, queryValue);
                 }
                 for (String fragment : apiEndpoint.fragments) {
-                    urlBuilder.encodedFragment(fragment);
+                    String f = SampleGenerator.populateURLPart(fragment);
+                    urlBuilder.encodedFragment(f);
                 }
 
                 HttpUrl httpUrl = urlBuilder.build();

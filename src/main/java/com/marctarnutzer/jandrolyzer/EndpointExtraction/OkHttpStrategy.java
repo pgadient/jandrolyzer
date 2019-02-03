@@ -22,18 +22,18 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.marctarnutzer.jandrolyzer.*;
 import com.marctarnutzer.jandrolyzer.Models.Project;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.JSONStringStrategy;
-import javassist.expr.MethodCall;
 import okhttp3.HttpUrl;
 
 import java.nio.file.Path;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 public class OkHttpStrategy {
 
     Project project;
     APIURLStrategy apiurlStrategy;
     JSONStringStrategy jsonStringStrategy;
+
+    Set<String> typeStrings = new HashSet<>(Arrays.asList("<STRING>", "<DOUBLE>", "<FLOAT>", "<INTEGER>", "<BOOLEAN>"));
 
     public OkHttpStrategy(Project project, APIURLStrategy apiurlStrategy, JSONStringStrategy jsonStringStrategy) {
         this.project = project;
@@ -515,7 +515,8 @@ public class OkHttpStrategy {
                                 continue;
                             }
 
-                            if (methodCallExpr.getName().asString().equals("addQueryParameter")) {
+                            if (methodCallExpr.getName().asString().equals("addQueryParameter")
+                                    && !typeStrings.contains(queryValue)) {
                                 HttpUrl httpUrl = new HttpUrl.Builder().scheme("http").host("somehost.com")
                                         .addQueryParameter(queryName, queryValue).build();
                                 String encodedQuery = httpUrl.encodedQuery();
