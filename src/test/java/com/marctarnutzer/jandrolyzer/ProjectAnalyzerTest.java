@@ -7,6 +7,8 @@
 
 package com.marctarnutzer.jandrolyzer;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
 import com.marctarnutzer.jandrolyzer.Models.Project;
 import org.junit.BeforeClass;
@@ -23,7 +25,8 @@ public class ProjectAnalyzerTest {
 
     static List<Project> projects = new LinkedList<>();
     static HashMap<String, HashSet<String>> libraries;
-    static Set<String> jsonModels = new HashSet<>();
+    static Set<JsonElement> jsonElements = new HashSet<>();
+    static JsonParser jsonParser = new JsonParser();
 
     /*
      * Test Setup
@@ -48,7 +51,8 @@ public class ProjectAnalyzerTest {
         assertFalse(projects.isEmpty());
 
         for (JSONRoot jsonRoot : projects.get(0).jsonModels.values()) {
-            jsonModels.add(jsonRoot.formatJSON());
+            JsonElement jsonElement = jsonParser.parse(jsonRoot.formatJSON());
+            jsonElements.add(jsonElement);
         }
     }
 
@@ -401,62 +405,74 @@ public class ProjectAnalyzerTest {
 
     @Test
     public void stringJSONTest1() {
-        assertTrue(jsonModels.contains("{\"jstestkey1\":\"testvalue1\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey1\":\"testvalue1\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest2() {
-        assertTrue(jsonModels.contains("{\"jstestkey2\":\"testvalue2\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey2\":\"testvalue2\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest3() {
-        assertTrue(jsonModels.contains("{\"jstestkey3\":\"testvalue3\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey3\":\"testvalue3\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest4() {
-        assertTrue(jsonModels.contains("{\"jstestkey4\":\"testvalue4\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey4\":\"testvalue4\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest5() {
-        assertTrue(jsonModels.contains("{\"jstestkey5\":\"testvalue5\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey5\":\"testvalue5\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest6() {
-        assertTrue(jsonModels.contains("{\"jstestkey6\":\"testvalue6\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey6\":\"testvalue6\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest7() {
-        assertTrue(jsonModels.contains("{\"jstestkey7\":\"testvalue7\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey7\":\"testvalue7\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest8() {
-        assertTrue(jsonModels.contains("{\"jstestkey8\":8}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey8\":8}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest9() {
-        assertTrue(jsonModels.contains("{\"jstestkey9\":true}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey9\":true}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest10() {
-        assertTrue(jsonModels.contains("{\"jstestkey10\":10}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey10\":10}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest11() {
-        assertTrue(jsonModels.contains("{\"jstestkey11\":\"<NUMBER_INT>\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey11\":\"<NUMBER_INT>\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void stringJSONTest12() {
-        assertTrue(jsonModels.contains("{\"jstestkey12\":\"<STRING>\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"jstestkey12\":\"<STRING>\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     /*
@@ -466,7 +482,8 @@ public class ProjectAnalyzerTest {
 
     @Test
     public void gsonJSONTest1() {
-        assertTrue(jsonModels.contains("{\"is_vip_GSON\":\"<BOOLEAN>\",\"otherAddresses\":[{\"number\":\"<NUMBER_INT>\"},{\"name\":\"<STRING>\"}],\"address\":{\"name\":\"<STRING>\",\"number\":\"<NUMBER_INT>\"},\"nameGSON\":\"<STRING>\",\"id\":\"<NUMBER_INT>\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"is_vip_GSON\":\"<BOOLEAN>\",\"otherAddresses\":[{\"number\":\"<NUMBER_INT>\"},{\"name\":\"<STRING>\"}],\"address\":{\"name\":\"<STRING>\",\"number\":\"<NUMBER_INT>\"},\"nameGSON\":\"<STRING>\",\"id\":\"<NUMBER_INT>\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     /*
@@ -476,7 +493,8 @@ public class ProjectAnalyzerTest {
 
     @Test
     public void moshiJSONTest1() {
-        assertTrue(jsonModels.contains("{\"name\":\"<STRING>\",\"is_vip\":\"<BOOLEAN>\",\"altAddresses\":[{\"number\":\"<NUMBER_INT>\"},{\"street\":\"<STRING>\"}],\"score\":\"<NUMBER_INT>\",\"address\":{\"street\":\"<STRING>\",\"number\":\"<NUMBER_INT>\"},\"userKind\":\"<STRING>\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"is_vip\":\"<BOOLEAN>\",\"name\":\"<STRING>\",\"score\":\"<NUMBER_INT>\",\"userKind\":\"<STRING>\",\"altAddresses\":[{\"street\":\"<STRING>\"},{\"number\":\"<NUMBER_INT>\"}],\"address\":{\"street\":\"<STRING>\",\"number\":\"<NUMBER_INT>\"}}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     /*
@@ -486,12 +504,14 @@ public class ProjectAnalyzerTest {
 
     @Test
     public void okHttpJSONTest1() {
-        assertTrue(jsonModels.contains("{\"name\":\"test\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"name\":\"test\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void okHttpJSONTest2() {
-        assertTrue(jsonModels.contains("{\"name\":\"test2\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"name\":\"test2\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     /*
@@ -501,7 +521,8 @@ public class ProjectAnalyzerTest {
 
     @Test
     public void retrofitJSONTest1() {
-        assertTrue(jsonModels.contains("{\"name\":\"<STRING>\",\"address\":{\"street\":\"<STRING>\",\"number\":\"<NUMBER_INT>\"}}"));
+        JsonElement jsonElement = jsonParser.parse("{\"name\":\"<STRING>\",\"address\":{\"street\":\"<STRING>\",\"number\":\"<NUMBER_INT>\"}}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     /*
@@ -511,53 +532,67 @@ public class ProjectAnalyzerTest {
 
     @Test
     public void orgJSONTest1() {
-        assertTrue(jsonModels.contains("{\"ojk1\":\"ojv1\",\"ojk2\":\"ojv2\",\"ojk3\":true}"));
+        JsonElement jsonElement = jsonParser.parse("{\"ojk1\":\"ojv1\",\"ojk2\":\"ojv2\",\"ojk3\":true}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void orgJSONTest2() {
-        assertTrue(jsonModels.contains("{\"ojk7\":\"ojv7\",\"ojk9_1\":91,\"ojk8\":null,\"ojk9\":9}"));
+        JsonElement jsonElement = jsonParser.parse("{\"ojk7\":\"ojv7\",\"ojk9_1\":91,\"ojk8\":null,\"ojk9\":9}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void orgJSONTest3() {
-        assertTrue(jsonModels.contains("{\"ojk4\":\"ojv4\",\"ojk5\":\"ojv5\",\"ojk6\":\"ojv6\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"ojk4\":\"ojv4\",\"ojk5\":\"ojv5\",\"ojk6\":\"ojv6\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void orgJSONTest4() {
-        assertTrue(jsonModels.contains("{\"ojk10\":\"ojv10\",\"ojk11\":\"ojv11\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"ojk10\":\"ojv10\",\"ojk11\":\"ojv11\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void orgJSONTest5() {
-        assertTrue(jsonModels.contains("{\"ojk12\":\"ojv12\",\"ojk13\":\"ojv13\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"ojk12\":\"ojv12\",\"ojk13\":\"ojv13\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void orgJSONTest6() {
-        assertTrue(jsonModels.contains("{\"oj16_1\":161,\"ojk16\":\"ojv16\",\"ojk15\":\"ojv15\",\"ojk14\":\"vv14\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"oj16_1\":161,\"ojk16\":\"ojv16\",\"ojk15\":\"ojv15\",\"ojk14\":\"vv14\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void orgJSONTest7() {
-        assertTrue(jsonModels.contains("{\"ojk19\":\"ojv19\",\"ojk18\":\"ojv18\",\"ojk17\":\"ojv17\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"ojk19\":\"ojv19\",\"ojk18\":\"ojv18\",\"ojk17\":\"ojv17\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void orgJSONTest8() {
-        assertTrue(jsonModels.contains("{\"ojk22\":\"ojv22\",\"ojk23\":[\"ojv23\"]}"));
+        JsonElement jsonElement = jsonParser.parse("{\"ojk22\":\"ojv22\",\"ojk23\":[\"ojv23\"]}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void orgJSONTest9() {
-        assertTrue(jsonModels.contains("{\"ojk10\":\"ojv10\",\"ojk25\":\"ojv25\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"ojk10\":\"ojv10\",\"ojk25\":\"ojv25\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
     @Test
     public void orgJSONTest10() {
-        assertTrue(jsonModels.contains("{\"ojk25\":\"ojv25\",\"ojk24\":\"ojv24\"}"));
+        JsonElement jsonElement = jsonParser.parse("{\"ojk25\":\"ojv25\",\"ojk24\":\"ojv24\"}");
+        assertTrue(jsonElements.contains(jsonElement));
     }
 
-    // TODO add jsonarray tests
+    @Test
+    public void orgJSONTest11() {
+        JsonElement jsonElement = jsonParser.parse("{\"ojk20\":[true,20,\"ojv20\"]}");
+        assertTrue(jsonElements.contains(jsonElement));
+    }
 }
