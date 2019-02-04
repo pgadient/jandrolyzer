@@ -161,8 +161,11 @@ public class APIURLStrategy {
             endpointPath = endpointPath.substring(0, endpointPath.length() - 1);
         }
 
-        String possibleQueryOrFragment = endpointString.replaceFirst(urlParts[0], "");
+        String possibleQueryOrFragment = endpointString.substring(urlParts[0].length());
+        //String possibleQueryOrFragment = endpointString.replaceFirst(urlParts[0], "");
         //possibleQueryOrFragment = possibleQueryOrFragment.replaceFirst("(\\?|#)", "");
+
+        System.out.println("Possible query or fragment string: " + possibleQueryOrFragment);
 
         APIEndpoint apiEndpoint = new APIEndpoint(endpointPath);
         if (httpMethod != null) {

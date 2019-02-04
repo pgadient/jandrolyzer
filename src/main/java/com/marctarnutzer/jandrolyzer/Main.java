@@ -114,6 +114,8 @@ public class Main {
 
         if (!projectPathList.isEmpty()) {
             analyzeSingleProject(projectPathList.get(0), librariesPath);
+        } else {
+            System.out.println("ProjectPathList is empty");
         }
     }
 

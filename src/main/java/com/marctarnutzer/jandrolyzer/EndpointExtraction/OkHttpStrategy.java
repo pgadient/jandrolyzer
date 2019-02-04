@@ -55,6 +55,10 @@ public class OkHttpStrategy {
 
         System.out.println("Estimated build() type: " + estimatedType);
 
+        if (estimatedType == null) {
+            return false;
+        }
+
         if (estimatedType.equals("okhttp3.HttpUrl")
                 || estimatedType.equals("okhttp.HttpUrl")
                 || estimatedType.equals("HttpUrl")) {
@@ -214,7 +218,7 @@ public class OkHttpStrategy {
                 List<String> bodyValues = new LinkedList<>();
                 for (MethodCallExpr requestBodyMCE : requestBodyMCEs) {
                     if (requestBodyMCE.getNameAsString().equals("create") && requestBodyMCE.getArguments().size() == 2) {
-                        bodyValues.addAll(ExpressionValueExtraction.getExpressionValue(requestBodyMCE.getArgument(1)));
+                        bodyValues.addAll(ExpressionValueExtraction.getExpressionValue(requestBodyMCE.getArgument(1), null));
                     }
                 }
 
@@ -483,7 +487,7 @@ public class OkHttpStrategy {
                             && methodCallExpr.getScope().get().asMethodCallExpr().getName().asString().equals("parse")
                             && methodCallExpr.getScope().get().asMethodCallExpr().getArguments().size() == 1) {
                         List<String> argValues = ExpressionValueExtraction.getExpressionValue(
-                                methodCallExpr.getScope().get().asMethodCallExpr().getArgument(0));
+                                methodCallExpr.getScope().get().asMethodCallExpr().getArgument(0), null);
 
                         if (preString.isEmpty()) {
                             toReturn = argValues;
@@ -503,8 +507,8 @@ public class OkHttpStrategy {
                         return null;
                     }
 
-                    List<String> arg0Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0));
-                    List<String> arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1));
+                    List<String> arg0Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null);
+                    List<String> arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1), null);
 
                     System.out.println("Arg 0 values: " + arg0Values + ", arg 1 values: " + arg1Values);
 
@@ -545,7 +549,7 @@ public class OkHttpStrategy {
                         return null;
                     }
 
-                    List<String> argValues = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0));
+                    List<String> argValues = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null);
 
                     System.out.println("Arg values: " + argValues);
 

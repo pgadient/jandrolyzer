@@ -216,7 +216,7 @@ public class AssignmentLocator {
         System.out.println("Method Dec: " + parentNode);
 
         MethodDeclaration methodDeclaration = (MethodDeclaration) parentNode;
-        ResolvedMethodDeclaration resolvedMethodDeclaration;
+        ResolvedMethodDeclaration resolvedMethodDeclaration = null;
         try {
             resolvedMethodDeclaration = methodDeclaration.resolve();
         } catch (Exception e) {
@@ -224,7 +224,21 @@ public class AssignmentLocator {
             return null;
         }
 
-        String methodDeclarationQSignature= resolvedMethodDeclaration.getQualifiedSignature();
+        if (resolvedMethodDeclaration == null) {
+            return null;
+        }
+
+        String methodDeclarationQSignature = null;
+        try {
+            methodDeclarationQSignature = resolvedMethodDeclaration.getQualifiedSignature();
+        } catch (Exception e) {
+            System.out.println("Error getting qualified signature: " + e);
+            return null;
+        }
+
+        if (methodDeclaration == null) {
+            return null;
+        }
 
         int parameterPosition = -1;
         for (Parameter param : methodDeclaration.getParameters()) {
@@ -251,6 +265,12 @@ public class AssignmentLocator {
             methodCallExprs.addAll(methodDeclaration.findCompilationUnit().get().findAll(MethodCallExpr.class));
         }
 
+        System.out.println("Number of methodCallExprs found: " + methodCallExprs.size());
+
+        if (methodCallExprs.size() > 100) {
+            return null;
+        }
+
         List<Node> lastAssignedNodes = new LinkedList<>();
         for (MethodCallExpr methodCallExpr : methodCallExprs) {
             if (!methodCallExpr.getNameAsString().equals(methodDeclaration.getNameAsString())
@@ -272,8 +292,37 @@ public class AssignmentLocator {
                 System.out.println("Found match: " + methodCallExpr);
                 Expression argExpr = methodCallExpr.getArgument(parameterPosition);
                 if (argExpr.isNameExpr()) {
-                    lastAssignedNodes.addAll(nameExprGetLastAssignedNode(argExpr.asNameExpr(), project));
+                    System.out.println("Its a nameExpr: " + argExpr);
+
+                    // Check if nameExpr resolves not to the same Parameter
+                    ResolvedValueDeclaration resolvedValueDeclaration;
+                    try {
+                        resolvedValueDeclaration = argExpr.asNameExpr().resolve();
+                    } catch (Exception e) {
+                        System.out.println("ASSIGNMENTLOCATOR error: Resolving name expr: " + e);
+                        return null;
+                    }
+
+                    if (resolvedValueDeclaration == null) {
+                        return null;
+                    }
+
+                    if (resolvedValueDeclaration instanceof JavaParserParameterDeclaration) {
+                        Node declarationNode2 = ((JavaParserParameterDeclaration) resolvedValueDeclaration).getWrappedNode();
+                        Node parentNode2 = Utils.getParentClassOrMethod(declarationNode2);
+
+                        if (parentNode2.equals(parentNode)) {
+                            System.out.println("Skip this argExpr...");
+                            return null;
+                        }
+                    }
+
+                    List<Node> lastAssigned = nameExprGetLastAssignedNode(argExpr.asNameExpr(), project);
+                    if (lastAssigned != null) {
+                        lastAssignedNodes.addAll(lastAssigned);
+                    }
                 } else if (argExpr.isLiteralExpr()) {
+                    System.out.println("Its a LiteralExpr: " + argExpr);
                     lastAssignedNodes.add(argExpr.asLiteralExpr());
                 }
             }

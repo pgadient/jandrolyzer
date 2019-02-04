@@ -280,18 +280,22 @@ public class ProjectAnalyzer implements Runnable {
 
     // Analyze node with symbol solving enabled
     private void analyzeNodeSS(Node node, String path, String name) {
-        if (node instanceof  ObjectCreationExpr) {
-            analyzeObjectCreationExpr(node, path, name);
-        } else if (node instanceof MethodCallExpr) {
-            analyzeMethodCallExpr(node, path, name);
-        } else if (node instanceof CastExpr) {
-            analyzeCastExpr(node, path, name);
-        } else if (node instanceof StringLiteralExpr) {
-            analyzeStringLiteralExpr(node, path);
-        } else if (node instanceof BinaryExpr) {
-            analyzeBinaryExpr(node, path);
-        } else if (node instanceof VariableDeclarator) {
-            analyzeVariableDeclarator(node);
+        try {
+            if (node instanceof  ObjectCreationExpr) {
+                analyzeObjectCreationExpr(node, path, name);
+            } else if (node instanceof MethodCallExpr) {
+                analyzeMethodCallExpr(node, path, name);
+            } else if (node instanceof CastExpr) {
+                analyzeCastExpr(node, path, name);
+            } else if (node instanceof StringLiteralExpr) {
+                analyzeStringLiteralExpr(node, path);
+            } else if (node instanceof BinaryExpr) {
+                analyzeBinaryExpr(node, path);
+            } else if (node instanceof VariableDeclarator) {
+                analyzeVariableDeclarator(node);
+            }
+        } catch (StackOverflowError e) {
+            System.out.println("Error while analyzing node: " + node + ", exception: " + e);
         }
 
         for (Node child : node.getChildNodes()) {

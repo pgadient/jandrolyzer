@@ -23,7 +23,7 @@ public class StringValueExtraction {
 
         System.out.println("Detected top level BinaryExpr: " + binaryExpr);
 
-        List<String> serializedBinaryExprs = ExpressionValueExtraction.serializeBinaryExpr(binaryExpr);
+        List<String> serializedBinaryExprs = ExpressionValueExtraction.serializeBinaryExpr(binaryExpr, null);
 
         return serializedBinaryExprs;
     }
@@ -57,7 +57,7 @@ public class StringValueExtraction {
 
         System.out.println("Detected rightmost concat method: " + methodCallExpr);
 
-        List<String> stringsToCheck = ExpressionValueExtraction.extractStringConcatValue(methodCallExpr);
+        List<String> stringsToCheck = ExpressionValueExtraction.extractStringConcatValue(methodCallExpr, null);
 
         return stringsToCheck;
     }

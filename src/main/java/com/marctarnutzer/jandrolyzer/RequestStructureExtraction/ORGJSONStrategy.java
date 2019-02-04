@@ -55,7 +55,7 @@ public class ORGJSONStrategy {
                 String typeString = TypeEstimator.estimateTypeName(arg);
 
                 if (typeString != null && typeString.equals("java.lang.String")) {
-                    List<String> preStrings = ExpressionValueExtraction.getExpressionValue(arg);
+                    List<String> preStrings = ExpressionValueExtraction.getExpressionValue(arg, null);
 
                     if (preStrings != null && !preStrings.isEmpty()) {
                         for (String preString : preStrings) {
@@ -166,8 +166,8 @@ public class ORGJSONStrategy {
                             List<String> arg2Values = null;
                             String argKind = null;
                             if (objectKind.equals("JSONObject")) {
-                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0));
-                                arg2Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1));
+                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null);
+                                arg2Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1), null);
 
                                 if (arg2Values == null) {
                                     if (methodCallExpr.getArgument(1).isNameExpr()) {
@@ -185,7 +185,7 @@ public class ORGJSONStrategy {
                                     }
                                 }
                             } else {
-                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0));
+                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null);
 
                                 if (arg1Values == null) {
                                     if (methodCallExpr.getArgument(0).isNameExpr()) {
@@ -379,7 +379,7 @@ public class ORGJSONStrategy {
                                     continue;
                                 }
 
-                                if (resolvedMethodDeclaration == null) {
+                                if (resolvedMethodDeclaration == null || !(resolvedMethodDeclaration instanceof JavaParserMethodDeclaration)) {
                                     continue;
                                 }
 
@@ -438,7 +438,7 @@ public class ORGJSONStrategy {
                                 String typeString = TypeEstimator.estimateTypeName(arg);
 
                                 if (typeString != null && typeString.equals("java.lang.String")) {
-                                    List<String> preValues = ExpressionValueExtraction.getExpressionValue(arg);
+                                    List<String> preValues = ExpressionValueExtraction.getExpressionValue(arg, null);
 
                                     if (preValues != null && !preValues.isEmpty()) {
                                         for (String preValue : preValues) {

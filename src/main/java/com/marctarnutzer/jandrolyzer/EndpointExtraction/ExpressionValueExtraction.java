@@ -64,10 +64,10 @@ public class ExpressionValueExtraction {
         List<String> toReturn = new LinkedList<>();
 
         if (objectCreationExpr.getArguments().size() == 1) {
-            toReturn = getExpressionValue(objectCreationExpr.getArgument(0));
+            toReturn = getExpressionValue(objectCreationExpr.getArgument(0), null);
         } else if (objectCreationExpr.getArguments().size() == 2) {
-            List<String> context = getExpressionValue(objectCreationExpr.getArgument(0));
-            List<String> spec = getExpressionValue(objectCreationExpr.getArgument(1));
+            List<String> context = getExpressionValue(objectCreationExpr.getArgument(0), null);
+            List<String> spec = getExpressionValue(objectCreationExpr.getArgument(1), null);
 
             if (context == null || context.isEmpty()
                     || spec == null || spec.isEmpty()) {
@@ -80,9 +80,9 @@ public class ExpressionValueExtraction {
                 }
             }
         } else if (objectCreationExpr.getArguments().size() == 3) {
-            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0));
-            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1));
-            List<String> file = getExpressionValue(objectCreationExpr.getArgument(2));
+            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0), null);
+            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1), null);
+            List<String> file = getExpressionValue(objectCreationExpr.getArgument(2), null);
 
             if (protocols == null || protocols.isEmpty()
                     || host == null || host.isEmpty() ||
@@ -98,10 +98,10 @@ public class ExpressionValueExtraction {
                 }
             }
         } else if (objectCreationExpr.getArguments().size() == 4) {
-            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0));
-            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1));
-            List<String> port = getExpressionValue(objectCreationExpr.getArgument(2));
-            List<String> file = getExpressionValue(objectCreationExpr.getArgument(3));
+            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0), null);
+            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1), null);
+            List<String> port = getExpressionValue(objectCreationExpr.getArgument(2), null);
+            List<String> file = getExpressionValue(objectCreationExpr.getArgument(3), null);
 
             if (protocols == null || protocols.isEmpty()
                     || host == null || host.isEmpty()
@@ -121,20 +121,20 @@ public class ExpressionValueExtraction {
             }
         }
 
-        if (toReturn.isEmpty()) {
+        if (toReturn == null || toReturn.isEmpty()) {
             return null;
         } else {
             return toReturn;
         }
     }
 
-    public static List<String> extractStringConcatValue(MethodCallExpr methodCallExpr) {
+    public static List<String> extractStringConcatValue(MethodCallExpr methodCallExpr, Set<Node> seenExpressions) {
         if (methodCallExpr.getArguments().size() != 1 || !methodCallExpr.getScope().isPresent()) {
             return null;
         }
 
         Expression scope = methodCallExpr.getScope().get();
-        List<String> toCheck = getExpressionValue(methodCallExpr.getArgument(0));
+        List<String> toCheck = getExpressionValue(methodCallExpr.getArgument(0), seenExpressions);
 
         if (toCheck == null || !(scope.isMethodCallExpr() || scope.isNameExpr() || scope.isFieldAccessExpr())) {
             return null;
@@ -142,9 +142,9 @@ public class ExpressionValueExtraction {
 
         List<String> prePath = null;
         if (scope.isMethodCallExpr()) {
-            prePath = extractStringConcatValue((MethodCallExpr) scope);
+            prePath = extractStringConcatValue((MethodCallExpr) scope, seenExpressions);
         } else if (scope.isNameExpr() || scope.isFieldAccessExpr()) {
-            prePath = getExpressionValue(scope);
+            prePath = getExpressionValue(scope, seenExpressions);
         }
 
         List<String> toReturn = new LinkedList<>();
@@ -229,8 +229,14 @@ public class ExpressionValueExtraction {
                         continue;
                     }
 
-                    if (!(resolvedValueDeclaration.getType().isReferenceType()
-                            && resolvedValueDeclaration.getType().asReferenceType().getQualifiedName()
+                    ResolvedType resolvedType = null;
+                    try {
+                        resolvedType = resolvedValueDeclaration.getType();
+                    } catch (Exception e) {
+                        continue;
+                    }
+
+                    if (!(resolvedType.isReferenceType() && resolvedType.asReferenceType().getQualifiedName()
                             .equals("java.lang.StringBuilder"))) {
                         continue;
                     }
@@ -306,9 +312,17 @@ public class ExpressionValueExtraction {
 
             ResolvedValueDeclaration resolvedValueDeclaration = null;
             if (scope.isNameExpr()) {
-                resolvedValueDeclaration = scope.asNameExpr().resolve();
+                try {
+                    resolvedValueDeclaration = scope.asNameExpr().resolve();
+                } catch (Exception e) {
+                    System.out.println("Error resolving NameExpr: " + e);
+                }
             } else if (scope.isFieldAccessExpr()) {
-                resolvedValueDeclaration = scope.asFieldAccessExpr().resolve();
+                try {
+                    resolvedValueDeclaration = scope.asFieldAccessExpr().resolve();
+                } catch (Exception e) {
+                    System.out.println("Error resolving NameExpr: " + e);
+                }
             }
 
             if (resolvedValueDeclaration == null) {
@@ -330,7 +344,7 @@ public class ExpressionValueExtraction {
                     continue;
                 }
 
-                List<String> appendValues = getExpressionValue(methodCallExpr.getArguments().get(0));
+                List<String> appendValues = getExpressionValue(methodCallExpr.getArguments().get(0), null);
                 if (appendValues == null || appendValues.isEmpty()) {
                     continue;
                 }
@@ -373,10 +387,11 @@ public class ExpressionValueExtraction {
         return potentialApiURLs;
     }
 
-    public static List<String> serializeBinaryExpr(BinaryExpr binaryExpr) {
+    public static List<String> serializeBinaryExpr(BinaryExpr binaryExpr, Set<Node> seenExpressions) {
         List<String> toReturn = new ArrayList<>();
 
         if (!binaryExpr.getOperator().asString().equals("+")) {
+            System.out.println("Not a plus operation, returning...");
             return null;
         }
 
@@ -384,13 +399,13 @@ public class ExpressionValueExtraction {
         Expression rightExpression = binaryExpr.getRight();
 
         if (leftExpression.isBinaryExpr()) {
-            toReturn = serializeBinaryExpr(leftExpression.asBinaryExpr());
+            toReturn = serializeBinaryExpr(leftExpression.asBinaryExpr(), seenExpressions);
         } else if (leftExpression.isStringLiteralExpr()) {
             toReturn = Arrays.asList(leftExpression.asStringLiteralExpr().getValue());
         } else if (leftExpression.isNameExpr()) {
-            toReturn = getExpressionValue(leftExpression.asNameExpr());
+            toReturn = getExpressionValue(leftExpression.asNameExpr(), seenExpressions);
         } else {
-            toReturn = getExpressionValue(leftExpression);
+            toReturn = getExpressionValue(leftExpression, seenExpressions);
         }
 
         if (toReturn == null) {
@@ -400,7 +415,7 @@ public class ExpressionValueExtraction {
         if (rightExpression.isBinaryExpr()) {
             List<String> appendedPaths = new ArrayList<>();
             for (String path : toReturn) {
-                List<String> serializedBinaryExprPaths = serializeBinaryExpr(rightExpression.asBinaryExpr());
+                List<String> serializedBinaryExprPaths = serializeBinaryExpr(rightExpression.asBinaryExpr(), seenExpressions);
                 if (serializedBinaryExprPaths == null) {
                     return null;
                 }
@@ -420,7 +435,7 @@ public class ExpressionValueExtraction {
         } else if (rightExpression.isNameExpr()) {
             List<String> appendedPaths = new ArrayList<>();
             for (String path: toReturn) {
-                List<String> serializedNameExprPaths = getExpressionValue(rightExpression.asNameExpr());
+                List<String> serializedNameExprPaths = getExpressionValue(rightExpression.asNameExpr(), seenExpressions);
                 if (serializedNameExprPaths == null) {
                     return null;
                 }
@@ -434,7 +449,7 @@ public class ExpressionValueExtraction {
         } else {
             List<String> appendPaths = new ArrayList<>();
             for (String path : toReturn) {
-                List<String> toAdd = getExpressionValue(rightExpression);
+                List<String> toAdd = getExpressionValue(rightExpression, seenExpressions);
                 if (toAdd == null) {
                     return null;
                 }
@@ -481,12 +496,15 @@ public class ExpressionValueExtraction {
         boolean contains = false;
         for (Node child : tempNode.getChildNodes()) {
             contains = contains(compareNode, child) || contains;
+            if (contains) {
+                break;
+            }
         }
 
         return contains;
     }
 
-    public static List<String> getExpressionValue(Expression expression) {
+    public static List<String> getExpressionValue(Expression expression, Set<Node> seenExpressions) {
         System.out.println("Getting value of expression: " + expression);
 
         if (expression.isNameExpr()) {
@@ -504,14 +522,41 @@ public class ExpressionValueExtraction {
                 }
             }
 
+            if (seenExpressions != null) {
+                seenExpressions.add(expression);
+            } else {
+                seenExpressions = new HashSet<>();
+                seenExpressions.add(expression);
+            }
+
+            System.out.println("Seen expressions size: " + seenExpressions.size());
+            System.out.println("Seen expressions: " + seenExpressions);
+
             for (Node assignedNode : assignedNodes) {
                 if (assignedNode instanceof Expression) {
+                    /*
                     if (assignedNode.containsWithin((Node) expression)) {
                         System.out.println("Dont look at node itself");
                         continue;
+                    } */
+                    boolean shouldSkip = false;
+                    for (Node e : seenExpressions) {
+                        /*
+                        if (assignedNode.containsWithin(e)) {
+                            shouldSkip = true;
+                            break;
+                        }*/
+                        if (contains(e, assignedNode)) {
+                            shouldSkip = true;
+                            break;
+                        }
+                    }
+                    if (shouldSkip) {
+                        System.out.println("Skipping already seen expression");
+                        continue;
                     }
                     System.out.println("Assigned expression: " + assignedNode);
-                    List<String> toAdd = getExpressionValue((Expression) assignedNode);
+                    List<String> toAdd = getExpressionValue((Expression) assignedNode, seenExpressions);
                     if (toAdd != null) {
                         toReturn.addAll(toAdd);
                     }
@@ -543,12 +588,12 @@ public class ExpressionValueExtraction {
         } else if (expression.isNullLiteralExpr()) {
             return Arrays.asList("null");
         } else if (expression.isBinaryExpr()) {
-            return serializeBinaryExpr(expression.asBinaryExpr());
+            return serializeBinaryExpr(expression.asBinaryExpr(), seenExpressions);
         } else if (expression.isMethodCallExpr()) {
             System.out.println("MethodCallExpr found: " + expression);
 
             if (expression.asMethodCallExpr().getName().asString().equals("concat")) {
-                return extractStringConcatValue(expression.asMethodCallExpr());
+                return extractStringConcatValue(expression.asMethodCallExpr(), seenExpressions);
             } else {
                 ResolvedMethodDeclaration resolvedMethodDeclaration = null;
                 try {
@@ -583,12 +628,43 @@ public class ExpressionValueExtraction {
                     return null;
                 }
 
+                if (seenExpressions != null && seenExpressions.contains(methodDeclaration)) {
+                    System.out.println("Already visited methodDeclaration");
+                    return null;
+                }
+
+                if (seenExpressions == null) {
+                    seenExpressions = new HashSet<>();
+                    seenExpressions.add(methodDeclaration);
+                } else {
+                    seenExpressions.add(methodDeclaration);
+                }
+
                 List<ReturnStmt> returnStmts = methodDeclaration.findAll(ReturnStmt.class);
                 List<String> toReturn = new LinkedList<>();
                 for (ReturnStmt returnStmt : returnStmts) {
                     System.out.println("Found return statement: " + returnStmt);
 
-                    List<String> returnExprResult = getExpressionValue(returnStmt.getExpression().get());
+                    if (!returnStmt.getExpression().isPresent()) {
+                        continue;
+                    }
+
+                    boolean shouldSkip = false;
+                    if (seenExpressions != null) {
+                        for (Node e : seenExpressions) {
+                            if (contains(e, returnStmt.getExpression().get())) {
+                                shouldSkip = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (shouldSkip) {
+                        System.out.println("Skipping return stmt: " + returnStmt);
+                        continue;
+                    }
+
+                    List<String> returnExprResult = getExpressionValue(returnStmt.getExpression().get(), seenExpressions);
 
                     if (returnExprResult == null) {
                         continue;
@@ -644,7 +720,7 @@ public class ExpressionValueExtraction {
                     }
 
                     if (variableDeclarator.getInitializer().isPresent()) {
-                        return getExpressionValue(variableDeclarator.getInitializer().get());
+                        return getExpressionValue(variableDeclarator.getInitializer().get(), seenExpressions);
                     }
                 }
             } else if (resolvedValueDeclaration instanceof ReflectionFieldDeclaration) {
