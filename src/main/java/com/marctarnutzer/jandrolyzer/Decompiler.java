@@ -8,8 +8,9 @@
 package com.marctarnutzer.jandrolyzer;
 
 import java.io.*;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.*;
 
 public class Decompiler {
 
@@ -17,6 +18,8 @@ public class Decompiler {
     private String pathToAPKsFolder;
     private String pathToJadx;
     private String outputPath;
+    private Timer timer = new Timer();
+    private boolean timerRanOut = false;
 
     public Decompiler(String pathToAPK, String pathToAPKsFolder, String pathToJadx, String outputPath) {
         this.pathToAPK = pathToAPK;
@@ -56,42 +59,42 @@ public class Decompiler {
     private String decompile(String path) {
         System.out.println("Starting decompilation process...");
 
-        Runtime runtime = Runtime.getRuntime();
-
         try {
             File file = new File(path);
             String op = Paths.get(outputPath, file.getName()).toString();
 
-            String jadxCommand = pathToJadx + " -d " + op + " -e " + path;
-            Process process = runtime.exec(jadxCommand);
+            List<String> jadxCommand = new ArrayList<>(Arrays.asList(pathToJadx, "-d", op, "-e", path));
+
+            ProcessBuilder processBuilder = new ProcessBuilder(jadxCommand);
+            processBuilder.redirectErrorStream(true);
+
+            Process process = processBuilder.start();
+
+            rescheduleTimer(process);
 
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            BufferedReader errorStream = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 
             String outputLine;
-
             while ((outputLine = inputStream.readLine()) != null) {
-                System.out.println("IStream: " + outputLine);
+                System.out.println("Output stream: " + outputLine);
+                rescheduleTimer(process);
             }
-
             inputStream.close();
 
-            boolean encounteredError = false;
-            while ((outputLine = errorStream.readLine()) != null) {
-                System.out.println("EStream: " + outputLine);
-                encounteredError = true;
-            }
+            process.waitFor();
 
-            errorStream.close();
+            timer.cancel();
+            timer.purge();
 
-            process.waitFor(); // Wait for jadx decompilation process to terminate
-
-            if (encounteredError) {
-                System.out.println("Decompilation process completed with errors.");
-            } else {
+            if (process.exitValue() == 0) {
                 System.out.println("Decompilation process completed.");
-                return op;
+                markProject(true, op);
+            } else {
+                System.out.println("Decompilation process completed with errors. ExitValue: " + process.exitValue());
+                markProject(false, op);
             }
+
+            return op;
         } catch (IOException e) {
             System.out.println("IOException while decompiling APK");
             e.printStackTrace();
@@ -103,4 +106,44 @@ public class Decompiler {
         return null;
     }
 
+    private void rescheduleTimer(Process process) {
+        timer.cancel();
+        timer.purge();
+        timer = new Timer();
+        timer.schedule(new TimerTask() {
+            public void run() {
+                System.out.println("Timer ran out. Stopping decompilation");
+                timerRanOut = true;
+                process.destroyForcibly();
+            }
+        }, 600000); // Waits for 10 Minutes before stopping the decompilation
+    }
+
+    private void markProject(boolean jadxSuccess, String decompiledProjectPath) {
+        System.out.println("Decompiled project path: " + decompiledProjectPath + ", jadxSuccess: " + jadxSuccess
+                + ", timer ran out: " + timerRanOut);
+
+        if (decompiledProjectPath == null) {
+            return;
+        }
+
+        String fileName;
+        if (jadxSuccess) {
+            fileName = "noJadxErrors";
+        } else {
+            fileName = "hasJadxErrors";
+        }
+        if (timerRanOut) {
+            fileName = "abortedDecompilation";
+        }
+
+        Path filePath = Paths.get(decompiledProjectPath, fileName);
+
+        File file = new File(filePath.toString());
+        try {
+            file.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

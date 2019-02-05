@@ -9,7 +9,6 @@ package com.marctarnutzer.jandrolyzer.APIAnalysis;
 
 import com.marctarnutzer.jandrolyzer.Models.*;
 import info.debatty.java.stringsimilarity.JaroWinkler;
-import okhttp3.HttpUrl;
 
 import java.util.Collections;
 import java.util.HashMap;

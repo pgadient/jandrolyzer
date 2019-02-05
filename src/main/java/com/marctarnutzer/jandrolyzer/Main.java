@@ -47,6 +47,9 @@ public class Main {
     @Parameter(names = {"-httpRequests", "-http"}, description = "Make HTTP requests to collected to endpoints")
     private static boolean httpRequests = false;
 
+    @Parameter(names = {"-decompilation_only", "-do"}, description = "Run decompilation only")
+    private static boolean decompilationOnly = false;
+
     // HashSet not ordered according to insertion order
     static HashMap<String, HashSet<String>> libraries;
 
@@ -102,7 +105,9 @@ public class Main {
 
         if (!projectPathsList.isEmpty()) {
             for (String path : projectPathsList) {
-                analyzeSingleProject(path, librariesPath);
+                if (!decompilationOnly) {
+                    analyzeSingleProject(path, librariesPath);
+                }
             }
         }
     }
@@ -113,7 +118,9 @@ public class Main {
         ArrayList<String> projectPathList = decompiler.startDecompilation();
 
         if (!projectPathList.isEmpty()) {
-            analyzeSingleProject(projectPathList.get(0), librariesPath);
+            if (!decompilationOnly) {
+                analyzeSingleProject(projectPathList.get(0), librariesPath);
+            }
         } else {
             System.out.println("ProjectPathList is empty");
         }
