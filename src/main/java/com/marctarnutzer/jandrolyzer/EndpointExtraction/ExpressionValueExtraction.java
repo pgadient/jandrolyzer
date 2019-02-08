@@ -167,7 +167,9 @@ public class ExpressionValueExtraction {
         List<String> potentialApiURLs = new LinkedList<>();
         if (containingNode instanceof MethodDeclaration) {
             List<MethodCallExpr> methodCallExprs = containingNode.findAll(MethodCallExpr.class);
+            System.out.println("Extracting StringBuilder values in MethodDeclaration");
             potentialApiURLs = reconstructStringBuilderStringsIn(methodCallExprs, variableDeclarator);
+            System.out.println("Finished extracting StringBuilder values");
         } else if (containingNode instanceof ClassOrInterfaceDeclaration) {
             if (variableDeclarator.getParentNode().isPresent() && variableDeclarator.getParentNode().get()
                     instanceof FieldDeclaration) {
@@ -183,10 +185,12 @@ public class ExpressionValueExtraction {
                 }
 
                 //List<MethodDeclaration> methodDeclarations = containingNode.findAll(MethodDeclaration.class);
+                System.out.println("Extracting StringBuilder values in MethodDeclarations: " + methodDeclarations.size());
                 for (MethodDeclaration methodDeclaration : methodDeclarations) {
                     List<MethodCallExpr> methodCallExprs = methodDeclaration.findAll(MethodCallExpr.class);
                     potentialApiURLs.addAll(reconstructStringBuilderStringsIn(methodCallExprs, fieldNode));
                 }
+                System.out.println("Finished extracting StringBuilder values in MethodDeclarations");
             }
         }
 
@@ -202,6 +206,10 @@ public class ExpressionValueExtraction {
         List<String> potentialApiURLs = new LinkedList<>();
         Stack<List<String>> chainedValuesStack = new Stack<>();
         for (MethodCallExpr methodCallExpr : methodCallExprs) {
+            if (potentialApiURLs.size() > 100) {
+                return potentialApiURLs;
+            }
+
             if (!methodCallExpr.getName().asString().equals("append")) {
                 /*
                  * Check if StringBuilder is passed to another method and append potential String values
@@ -260,11 +268,15 @@ public class ExpressionValueExtraction {
                         }
 
                         List<MethodCallExpr> mMethodCallExpr = methodDeclaration.findAll(MethodCallExpr.class);
+                        System.out.println("Reconstructing StringBuilder string from methodCallExpr");
                         List<String> sbValues = reconstructStringBuilderStringsIn(mMethodCallExpr, methodDeclaration.getParameter(parameterNbr));
+                        System.out.println("Reconstruct StringBuilder string from methodCallExpr finished, size: " + sbValues.size());
 
                         if (sbValues.isEmpty()) {
                             continue;
                         }
+
+                        System.out.println("PotentialAPIURLs size: " + potentialApiURLs.size());
 
                         List<String> appendedPotentialAPIURLs = new ArrayList<>();
                         if (!potentialApiURLs.isEmpty()) {
@@ -275,11 +287,15 @@ public class ExpressionValueExtraction {
                             }
                         } else {
                             for (String sbValue : sbValues) {
+                                System.out.println("appendedPotentialAPIURLs size: " + appendedPotentialAPIURLs.size());
                                 appendedPotentialAPIURLs.add(sbValue);
                             }
                         }
 
                         potentialApiURLs = appendedPotentialAPIURLs;
+
+                        System.out.println("Added to potentialApiURLs");
+
                         continue;
                     }
 
@@ -354,6 +370,8 @@ public class ExpressionValueExtraction {
                 if (methodCallExpr.getScope().get().isNameExpr() || methodCallExpr.getScope().get()
                         .isFieldAccessExpr()) {
                     List<String> appendValuesToCheck = new LinkedList<>();
+                    System.out.println("appendValues size: " + appendValues.size());
+                    System.out.println("potentialApiURLs size: " + potentialApiURLs.size());
                     for (String appendValue : appendValues) {
                         if (potentialApiURLs.isEmpty()) {
                             appendValuesToCheck.add(appendValue);
@@ -364,9 +382,12 @@ public class ExpressionValueExtraction {
                         }
                     }
 
+                    System.out.println("Stack size: " + chainedValuesStack.size());
+
                     List<String> appendValuesToCheckStackIncl = new LinkedList<>();
                     while (!chainedValuesStack.isEmpty()) {
                         for (String appendValue : chainedValuesStack.pop()) {
+                            System.out.println("Adding from stack: " + appendValue);
                             for (String preValue : appendValuesToCheck) {
                                 appendValuesToCheckStackIncl.add(preValue + appendValue);
                             }
@@ -377,9 +398,15 @@ public class ExpressionValueExtraction {
                         appendValuesToCheck = appendValuesToCheckStackIncl;
                     }
 
+                    System.out.println("appendValuesToCheck size: " + appendValuesToCheck.size());
+
                     potentialApiURLs = appendValuesToCheck;
+
+                    System.out.println("Added");
                 } else {
+                    System.out.println("Pushing to stack, stacksize: " + chainedValuesStack.size());
                     chainedValuesStack.push(appendValues);
+                    System.out.println("Pushed to stack");
                 }
             }
         }

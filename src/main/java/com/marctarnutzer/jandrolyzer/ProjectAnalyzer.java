@@ -120,7 +120,7 @@ public class ProjectAnalyzer implements Runnable {
         for (SourceRoot sourceRoot : projectRoot.getSourceRoots()) {
             try {
                 sourceRoot.tryToParse();
-                this.project.compilationUnits.addAll(sourceRoot.getCompilationUnits());
+                //this.project.compilationUnits.addAll(sourceRoot.getCompilationUnits());
             } catch (IOException e) {
                 e.printStackTrace();
                 return;
@@ -134,6 +134,7 @@ public class ProjectAnalyzer implements Runnable {
             try {
                 sourceRoot.tryToParse();
                 compilationUnits = sourceRoot.getCompilationUnits();
+                this.project.compilationUnits.addAll(compilationUnits);
             } catch (IOException e) {
                 e.printStackTrace();
                 return;

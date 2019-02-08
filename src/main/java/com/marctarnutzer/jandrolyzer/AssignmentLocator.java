@@ -267,9 +267,11 @@ public class AssignmentLocator {
 
         System.out.println("Number of methodCallExprs found: " + methodCallExprs.size());
 
+        /*
         if (methodCallExprs.size() > 100) {
             return null;
         }
+        */
 
         List<Node> lastAssignedNodes = new LinkedList<>();
         for (MethodCallExpr methodCallExpr : methodCallExprs) {
