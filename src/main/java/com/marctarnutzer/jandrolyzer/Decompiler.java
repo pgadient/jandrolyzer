@@ -18,7 +18,7 @@ public class Decompiler {
     private String pathToAPKsFolder;
     private String pathToJadx;
     private String outputPath;
-    private Timer timer = new Timer();
+    //private Timer timer = new Timer();
     private boolean timerRanOut = false;
 
     public Decompiler(String pathToAPK, String pathToAPKsFolder, String pathToJadx, String outputPath) {
@@ -70,21 +70,21 @@ public class Decompiler {
 
             Process process = processBuilder.start();
 
-            rescheduleTimer(process);
+            //rescheduleTimer(process);
 
             BufferedReader inputStream = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
             String outputLine;
             while ((outputLine = inputStream.readLine()) != null) {
                 System.out.println("Output stream: " + outputLine);
-                rescheduleTimer(process);
+                //rescheduleTimer(process);
             }
             inputStream.close();
 
             process.waitFor();
 
-            timer.cancel();
-            timer.purge();
+            //timer.cancel();
+            //timer.purge();
 
             if (process.exitValue() == 0) {
                 System.out.println("Decompilation process completed.");
@@ -106,6 +106,7 @@ public class Decompiler {
         return null;
     }
 
+    /*
     private void rescheduleTimer(Process process) {
         timer.cancel();
         timer.purge();
@@ -118,6 +119,7 @@ public class Decompiler {
             }
         }, 600000); // Waits for 10 Minutes before stopping the decompilation
     }
+    */
 
     private void markProject(boolean jadxSuccess, String decompiledProjectPath) {
         System.out.println("Decompiled project path: " + decompiledProjectPath + ", jadxSuccess: " + jadxSuccess
