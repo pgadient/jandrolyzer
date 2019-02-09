@@ -44,6 +44,10 @@ public class JSONRoot {
         return this.jsonObject.formatJSON();
     }
 
+    public String formatJSONWithoutValues() {
+        return this.jsonObject.formatJSONWithoutValues();
+    }
+
     public String logInfoAndJSON() {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("Path: \n" + this.path + "\n");

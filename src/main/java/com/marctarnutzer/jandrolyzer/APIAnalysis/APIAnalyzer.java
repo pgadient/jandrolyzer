@@ -9,8 +9,12 @@ package com.marctarnutzer.jandrolyzer.APIAnalysis;
 
 import com.marctarnutzer.jandrolyzer.Models.*;
 import okhttp3.*;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
@@ -19,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 public class APIAnalyzer {
 
     private List<Project> projects;
+    private String projectPath;
+    private boolean shouldMakeHttpRequests;
     private Set<String> httpMethods = new HashSet<>(Arrays.asList(
             "GET",
             "POST",
@@ -30,39 +36,71 @@ public class APIAnalyzer {
             .writeTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
+    public ConcurrentLinkedQueue<RequestResponse> requestResponses = new ConcurrentLinkedQueue<>();
 
-    public APIAnalyzer(List<Project> projects) {
+    public APIAnalyzer(List<Project> projects, boolean shouldMakeHttpRequests, String projectPath) {
         this.projects = projects;
+        this.shouldMakeHttpRequests = shouldMakeHttpRequests;
+        this.projectPath = projectPath;
     }
 
     public void analyzeAll() {
-        for (Project project : projects) {
-            System.out.println("Analyzing API endpoints of project: " + project.name);
+        if (projects != null) {
+            for (Project project : projects) {
+                System.out.println("Analyzing API endpoints of project: " + project.name);
+                System.out.println("Preparing data...");
+                try {
+                    prepareData(project);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
 
-            analyzeAPIEndpoints(project);
+                if (shouldMakeHttpRequests) {
+                    System.out.println("Testing endpoints...");
+                    testEndpoints(project.path);
+                }
+            }
+        } else if (projectPath != null) {
+            System.out.println("Testing endpoints...");
+            testEndpoints(projectPath);
         }
     }
 
-    private void analyzeAPIEndpoints(Project project) {
-        int requestsCount = 0;
+    /*
+     * Fills found URL queries and JSON structures with values and saves results to file
+     * for later processing.
+     */
+    private void prepareData(Project project) throws IOException {
+        Path path = Paths.get(project.path, "extractedData.jan");
+        BufferedWriter writer = new BufferedWriter(new FileWriter(path.toString()));
+        writer.write("ENDPOINTS:");
+        writer.newLine();
+
+
+        List<String> nonPopulatedURLs = new LinkedList<>();
+        List<String> populatedURLs = new LinkedList<>();
         for (APIURL apiurl : project.apiURLs.values()) {
-            for (APIEndpoint apiEndpoint : apiurl.endpoints.values()) {
-                requestsCount++;
-            }
-        }
-        int httpMethodCount = 1;
-        requestsCount = requestsCount * httpMethodCount;
-        CountDownLatch latch = new CountDownLatch(requestsCount);
-
-        for (APIURL apiurl : project.apiURLs.values()) {
-
-            SampleGenerator.populateQueryValues(apiurl, project);
-
             String baseURL = apiurl.getBaseURL();
             for (APIEndpoint apiEndpoint : apiurl.endpoints.values()) {
                 HttpUrl.Builder urlBuilder = HttpUrl.parse(baseURL).newBuilder();
-                String path = SampleGenerator.populateURLPart(apiEndpoint.path);
-                urlBuilder.addEncodedPathSegments(path);
+                urlBuilder.addEncodedPathSegments(apiEndpoint.path);
+                for (Map.Entry<String, String> query : apiEndpoint.queries.entrySet()) {
+                    urlBuilder.addEncodedQueryParameter(query.getKey(), query.getValue());
+                }
+                for (String fragment : apiEndpoint.fragments) {
+                    urlBuilder.encodedFragment(fragment);
+                }
+
+                HttpUrl httpUrl = urlBuilder.build();
+                nonPopulatedURLs.add(httpUrl.toString());
+            }
+
+            SampleGenerator.populateQueryValues(apiurl, project);
+
+            for (APIEndpoint apiEndpoint : apiurl.endpoints.values()) {
+                HttpUrl.Builder urlBuilder = HttpUrl.parse(baseURL).newBuilder();
+                String urlPath = SampleGenerator.populateURLPart(apiEndpoint.path);
+                urlBuilder.addEncodedPathSegments(urlPath);
                 for (Map.Entry<String, String> query : apiEndpoint.queries.entrySet()) {
                     String queryKey = SampleGenerator.populateURLPart(query.getKey());
                     String queryValue = SampleGenerator.populateURLPart(query.getValue());
@@ -74,26 +112,110 @@ public class APIAnalyzer {
                 }
 
                 HttpUrl httpUrl = urlBuilder.build();
+                populatedURLs.add(httpUrl.toString());
+            }
+        }
 
-                for (String httpMethod : httpMethods) {
-                    if (httpMethod.equals("GET")) {
-                        System.out.println("Testing URL: " + httpUrl + " [" + httpMethod + "]");
+        for (int i = 0; i < nonPopulatedURLs.size(); i++) {
+            writer.write(nonPopulatedURLs.get(i));
+            writer.newLine();
+            writer.write(populatedURLs.get(i));
+            writer.newLine();
+        }
 
-                        //makeRequest(httpUrl, null, httpMethod, project.requestResponses, latch);
-                    } else if (httpMethod.equals("POST")) {
-                        System.out.println("Testing URL: " + httpUrl + " [" + httpMethod + "]");
+        writer.write("JSON:");
+        writer.newLine();
 
-                        //makeRequest(httpUrl, null, httpMethod, project.requestResponses, latch);
+        for (JSONRoot jsonRoot : project.jsonModels.values()) {
+            String nonPopulatedJSONString = jsonRoot.formatJSONWithoutValues();
+            String populatedJSONString = SampleGenerator.populateJSON(jsonRoot, project);
 
-                        for (JSONRoot jsonRoot : project.jsonModels.values()) {
-                            String jsonString = SampleGenerator.populateJSON(jsonRoot, project);
+            writer.write(nonPopulatedJSONString);
+            writer.newLine();
+            writer.write(populatedJSONString);
+            writer.newLine();
+        }
 
-                            System.out.println("Making request with JSON: " + jsonString);
+        writer.write("STRING VARIABLES:");
+        writer.newLine();
 
-                            //makeRequest(httpUrl, jsonString, httpMethod, project.requestResponses, latch);
-                        }
-                    } else {
-                        System.out.println("Blocked testing of URL: " + httpUrl + " [" + httpMethod + "]");
+        for (Map.Entry<String, Set<String>> entry : project.stringVariables.entrySet()) {
+            JSONArray jsonArray = new JSONArray();
+            for (String value : entry.getValue()) {
+                jsonArray.put(value);
+            }
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put(entry.getKey(), jsonArray);
+
+            writer.write(jsonObject.toString());
+            writer.newLine();
+        }
+
+        writer.write("SNIPPETS:");
+        writer.newLine();
+
+        for (Snippet snippet : project.snippets) {
+            writer.write(snippet.toString());
+        }
+
+        writer.close();
+
+        System.out.println("Saved data");
+    }
+
+    private void testEndpoints(String projectPath) {
+        List<String> endpoints = new LinkedList<>();
+        List<String> jsonStrings = new LinkedList<>();
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(Paths.get(projectPath, "extractedData.jan").toString()));
+            String line = reader.readLine();
+            line = reader.readLine();
+            int i = 0;
+            while (!line.equals("JSON:")) {
+                i++;
+                if ((i % 2) == 0) {
+                    endpoints.add(line);
+                }
+                line = reader.readLine();
+            }
+            line = reader.readLine();
+            i = 0;
+            while (!line.equals("STRING VARIABLES:")) {
+                i++;
+                if ((i % 2) == 0) {
+                    jsonStrings.add(line);
+                }
+                line = reader.readLine();
+            }
+            reader.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        int requestsCount = endpoints.size() * httpMethods.size() + (endpoints.size() * (httpMethods.size() - 1) * jsonStrings.size());
+        CountDownLatch latch = new CountDownLatch(requestsCount);
+
+        for (String endpoint : endpoints) {
+            HttpUrl httpUrl = HttpUrl.parse(endpoint);
+            for (String httpMethod : httpMethods) {
+                if (httpMethod.equals("GET")) {
+                    System.out.println("Testing URL: " + endpoint + " [" + httpMethod + "]");
+                    makeRequest(httpUrl, null, httpMethod, requestResponses, latch);
+                } else if (httpMethod.equals("POST")) {
+                    System.out.println("Testing URL: " + endpoint + " [" + httpMethod + "]");
+                    makeRequest(httpUrl, null, httpMethod, requestResponses, latch);
+
+                    for (String jsonString : jsonStrings) {
+                        System.out.println("Making request with JSON: " + jsonString);
+                        makeRequest(httpUrl, jsonString, httpMethod, requestResponses, latch);
+                    }
+                } else {
+                    System.out.println("Blocked testing of URL: " + endpoint + " [" + httpMethod + "], latch: " + latch.getCount());
+                    latch.countDown();
+                    for (String jsonSring : jsonStrings) {
+                        latch.countDown();
                     }
                 }
             }
@@ -106,8 +228,18 @@ public class APIAnalyzer {
         }
 
         System.out.println("API Endpoint results: ");
-        for (RequestResponse requestResponse : project.requestResponses) {
+        for (RequestResponse requestResponse : requestResponses) {
             System.out.println("Request response: \n" + requestResponse);
+        }
+
+        Path path = Paths.get(projectPath, "RequestResponses.jan");
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(path.toString()))) {
+            for (RequestResponse requestResponse : requestResponses) {
+                writer.write(requestResponse.toString());
+            }
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -118,11 +250,11 @@ public class APIAnalyzer {
         okHttpClient.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                System.out.println("API call failed: " + e);
                 requestResponses.add(new RequestResponse(httpUrl.toString(),
-                        httpMethod, false, e.toString(), null));
+                        httpMethod, false, e.toString(), null, jsonString, -1));
 
                 latch.countDown();
+                System.out.println("Latch: " + latch.getCount() + "API call failed: " + e);
             }
 
             @Override
@@ -145,12 +277,13 @@ public class APIAnalyzer {
                     }
 
                     String respBody = responseBody.string();
-                    RequestResponse requestResponse = new RequestResponse(httpUrl.toString(),
-                            httpMethod, response.isSuccessful(), response.message(), respBody);
+                    RequestResponse requestResponse = new RequestResponse(httpUrl.toString(), httpMethod,
+                            response.isSuccessful(), response.message(), respBody, jsonString, response.code());
                     requestResponse.headers = headerMap;
                     requestResponses.add(requestResponse);
                 } finally {
                     latch.countDown();
+                    System.out.println("Request success, latch: "+ latch.getCount());
                 }
             }
         });

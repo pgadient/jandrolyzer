@@ -40,6 +40,11 @@ public class Main {
             variableArity = true)
     private static List<String> projectsPath = new ArrayList<>();
 
+    // Analyze APIs
+    @Parameter(names = {"--analyzed_project_path", "-app"}, description
+            = "Analyze endpoints of an already analyzed project", variableArity = true)
+    private static List<String> analyzedProjectPath = new ArrayList<>();
+
     // Additional arguments
     @Parameter(names = {"--libraries_path", "-lp"}, description = "Location of libraries", required = true)
     private static List<String> librariesPath = new ArrayList<>();
@@ -76,6 +81,8 @@ public class Main {
 
             analyzeMultipleAPKs(argToPath(apksPath), argToPath(jadxPath), argToPath(outputPath),
                     argToPath(librariesPath));
+        } else if (!analyzedProjectPath.isEmpty()) {
+            analyzeAPIs(null, argToPath(analyzedProjectPath));
         }
 
         System.out.println("All done!");
@@ -138,15 +145,11 @@ public class Main {
 
         System.out.println(projects.get(0).minimalStringRepresentation());
 
-        analyzeAPIs(projects);
+        analyzeAPIs(projects, null);
     }
 
-    static void analyzeAPIs(List<Project> projects) {
-        if (!httpRequests) {
-            return;
-        }
-
-        APIAnalyzer apiAnalyzer = new APIAnalyzer(projects);
+    static void analyzeAPIs(List<Project> projects, String projectPath) {
+        APIAnalyzer apiAnalyzer = new APIAnalyzer(projects, httpRequests, projectPath);
         apiAnalyzer.analyzeAll();
     }
 

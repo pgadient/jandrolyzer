@@ -76,13 +76,25 @@ public class JSONObject {
         return stringBuilder.toString();
     }
 
+    public String formatJSONWithoutValues() {
+        return buildJSONFormat(false);
+    }
+
     public String formatJSON() {
+        return buildJSONFormat(true);
+    }
+
+    private String buildJSONFormat(boolean shouldInsertValues) {
         StringBuilder stringBuilder = new StringBuilder();
         if (this.jsonDataType == JSONDataType.OBJECT) {
             stringBuilder.append("{");
 
             for (Map.Entry<String, JSONObject> jsonObjectEntry : this.linkedHashMap.entrySet()) {
-                stringBuilder.append("\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue().formatJSON() + ",");
+                if (shouldInsertValues) {
+                    stringBuilder.append("\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue().formatJSON() + ",");
+                } else {
+                    stringBuilder.append("\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue().formatJSONWithoutValues() + ",");
+                }
             }
 
             stringBuilder.deleteCharAt(stringBuilder.length() - 1);
@@ -93,7 +105,11 @@ public class JSONObject {
 
             if (!this.arrayElementsSet.isEmpty()) {
                 for (JSONObject jsonObject : this.arrayElementsSet) {
-                    stringBuilder.append(jsonObject.formatJSON() + ",");
+                    if (shouldInsertValues) {
+                        stringBuilder.append(jsonObject.formatJSON() + ",");
+                    } else {
+                        stringBuilder.append(jsonObject.formatJSONWithoutValues() + ",");
+                    }
                 }
                 stringBuilder.deleteCharAt(stringBuilder.length() - 1);
             }
@@ -103,8 +119,13 @@ public class JSONObject {
                     stringBuilder.append(",");
                 }
                 for (Map.Entry<String, JSONObject> jsonObjectEntry : this.linkedHashMap.entrySet()) {
-                    stringBuilder.append("{\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue()
-                            .formatJSON() + "},");
+                    if (shouldInsertValues) {
+                        stringBuilder.append("{\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue()
+                                .formatJSON() + "},");
+                    } else {
+                        stringBuilder.append("{\"" + jsonObjectEntry.getKey()+ "\":" + jsonObjectEntry.getValue()
+                                .formatJSONWithoutValues() + "},");
+                    }
                 }
                 stringBuilder.deleteCharAt(stringBuilder.length() - 1);
             }
@@ -112,10 +133,14 @@ public class JSONObject {
             stringBuilder.append("]");
         } else {
             if (value != null) {
-                if (this.jsonDataType == JSONDataType.STRING) {
-                    stringBuilder.append("\"" + value.toString() + "\"");
+                if (shouldInsertValues) {
+                    if (this.jsonDataType == JSONDataType.STRING) {
+                        stringBuilder.append("\"" + value.toString() + "\"");
+                    } else {
+                        stringBuilder.append(value.toString());
+                    }
                 } else {
-                    stringBuilder.append(value.toString());
+                    stringBuilder.append("\"<" + jsonDataType + ">\"");
                 }
             } else {
                 if (jsonDataType.equals(JSONDataType.NULL)) {
