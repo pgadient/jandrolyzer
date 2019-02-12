@@ -24,10 +24,10 @@ public class JSONRoot {
         this.scopeName = scopeName;
     }
 
-    //TODO: Maybe change to path & className & [the whole class, constructor, method, etc. chain separated by &]
     public String getIdentifier() {
-        return path + "&" + className + "&" + methodName + "&" + scopeName + "&" + salt;
+        return path + "&" + salt;
     }
+
 
     public String toString() {
         StringBuilder stringBuilder = new StringBuilder();
@@ -36,6 +36,15 @@ public class JSONRoot {
         stringBuilder.append("Method name: \n" + this.methodName + "\n");
         stringBuilder.append("Scope name: \n" + this.scopeName + "\n");
         stringBuilder.append("JSON Object: \n" + this.jsonObject + "\n");
+        stringBuilder.append("=========================JSONRoot=========================\n");
+        return stringBuilder.toString();
+    }
+
+    public String getJSONDetails() {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("Path: \n" + this.path + "\n");
+        stringBuilder.append("Library: \n" + this.library + "\n");
+        stringBuilder.append("JSON Object: \n" + this.jsonObject.formatJSON() + "\n");
         stringBuilder.append("=========================JSONRoot=========================\n");
         return stringBuilder.toString();
     }

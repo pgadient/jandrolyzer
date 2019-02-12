@@ -11,8 +11,10 @@ import java.util.HashMap;
 
 public class APIURL {
 
+    public String path;
     public String scheme;
     public String authority;
+    public String library;
     public HashMap<String, APIEndpoint> endpoints = new HashMap<>();
 
     public APIURL(String scheme) {
@@ -25,9 +27,11 @@ public class APIURL {
 
     public String toString() {
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("Scheme: " + this.scheme + "\n");
-        stringBuilder.append("Authority: " + this.authority + "\n");
-        stringBuilder.append("Base URL: " + getBaseURL() + "\n");
+        stringBuilder.append("Path: \n" + this.path + "\n");
+        stringBuilder.append("Library: \n" + this.library + "\n");
+        stringBuilder.append("Scheme: \n" + this.scheme + "\n");
+        stringBuilder.append("Authority: \n" + this.authority + "\n");
+        stringBuilder.append("Base URL: \n" + getBaseURL() + "\n");
         stringBuilder.append("Endpoints: \n");
         for (APIEndpoint endpoint : this.endpoints.values()) {
             stringBuilder.append(endpoint.toString());

@@ -24,12 +24,13 @@ public class JSONStringStrategy {
 
     private JSONDeserializer jsonDeserializer = new JSONDeserializer();
 
-    public boolean extract(List<String> potentialJSONStrings, Project project) {
+    public boolean extract(List<String> potentialJSONStrings, Project project, String libraryName, String path) {
         boolean foundValidJSON = false;
 
         for (String potentialJSONString : potentialJSONStrings) {
             System.out.println("Checking for JSON: " + potentialJSONString);
-            foundValidJSON = parse(potentialJSONString, "noinfo", project.jsonModels) || foundValidJSON;
+            foundValidJSON = parse(potentialJSONString, path, project.jsonModels, libraryName)
+                    || foundValidJSON;
         }
 
         return foundValidJSON;
@@ -40,17 +41,17 @@ public class JSONStringStrategy {
      * Returns boolean value whether valid JSON model was found or not
      */
     public boolean parse(StringLiteralExpr stringLiteralExpr, String path, Map<String, JSONRoot> jsonModels) {
-        return parse(stringLiteralExpr.getValue(), path, jsonModels);
+        return parse(stringLiteralExpr.getValue(), path, jsonModels, "noLib.StringLiteralExpr");
     }
 
-    public boolean parse(String potJSONString, String path, Map<String, JSONRoot> jsonModels) {
+    public boolean parse(String potJSONString, String path, Map<String, JSONRoot> jsonModels, String libraryName) {
         String toCheck = Utils.removeEscapeSequencesFrom(potJSONString);
 
         JSONRoot jsonRoot = jsonDeserializer.deserialize(toCheck, path);
 
         if (jsonRoot != null) {
             jsonRoot.salt = UUID.randomUUID().toString().replace("-", "");
-            jsonRoot.library = "noLib.StringLiteralExpr";
+            jsonRoot.library = libraryName;
 
             boolean isDuplicate = false;
             for (Map.Entry<String, JSONRoot> entry : jsonModels.entrySet()) {

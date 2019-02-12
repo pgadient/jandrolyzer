@@ -7,11 +7,13 @@
 
 package com.marctarnutzer.jandrolyzer;
 
+import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.NoSuchElementException;
@@ -19,6 +21,16 @@ import java.util.NoSuchElementException;
 public class Utils {
 
     static HashMap<String, HashSet<String>> libraries = new HashMap<>();
+
+    public static String getPathForNode(Node node) {
+        String path = null;
+        if (node.findCompilationUnit().isPresent()) {
+            path = node.findCompilationUnit().get().getStorage().map(CompilationUnit.Storage::getPath)
+                    .map(Path::toString).orElse(null);
+        }
+
+        return path;
+    }
 
     public static HashMap<String, HashSet<String>> getLibraries() {
         if (libraries.isEmpty()) {

@@ -151,7 +151,6 @@ public class ProjectAnalyzer implements Runnable {
                         continue;
                     }
 
-                    // TODO: Specify file to print in ProjectAnalyzer parameters or move to separate class
                     if (shouldPrintAST) {
                         if (name.equals("ORGJSONExtractionTesting.java")) {
                             DotPrinter printer = new DotPrinter(true);
@@ -313,50 +312,51 @@ public class ProjectAnalyzer implements Runnable {
             return;
         }
 
-        List<String> assembledStrings = new LinkedList<>();
         List<String> assembledStringsSV = StringValueExtraction.extract((VariableDeclarator) node, this.project);
-
         if (assembledStringsSV != null) {
-            assembledStrings = assembledStringsSV;
+            String path = Utils.getPathForNode(node);
+
+            boolean isValidURL = apiurlStrategy.extract(assembledStringsSV, this.project, "noLib", path);
+
+            /*
+            if (isValidURL) {
+                return;
+            }
+            */
+
+            boolean isValidJSON = jsonStringStrategy.extract(assembledStringsSV, this.project, "noLib", path);
+
+            /*
+            if (isValidJSON) {
+                return;
+            }
+            */
         }
 
         List<String> assembledJSONStrings = orgjsonStrategy.extract((VariableDeclarator) node, this.project);
-
         if (assembledJSONStrings != null) {
-            assembledStrings.addAll(assembledJSONStrings);
+            String path = Utils.getPathForNode(node);
+
+            boolean isValidJSON = jsonStringStrategy.extract(assembledJSONStrings, this.project, "org.json", path);
+
+            if (isValidJSON) {
+                return;
+            }
         }
-
-        boolean isValidURL = apiurlStrategy.extract(assembledStrings, this.project);
-
-        if (isValidURL) {
-            return;
-        }
-
-        boolean isValidJSON = jsonStringStrategy.extract(assembledStrings, this.project);
-
-        // Check if a new StringBuilder object is created and check if it contains API endpoint information
-        //boolean foundAPIURL = apiurlStrategy.extract((VariableDeclarator) node, this.project);
-        /*
-        if (foundAPIURL) {
-            return;
-        }
-        */
-
-        // Check if a HttpUrl.Builder object is created and check if it contains API endpoint information
-        //foundAPIURL = okHttpStrategy.extract((VariableDeclarator) node);
     }
 
     private void analyzeStringLiteralExpr(Node node, String path) {
-        // Check if StringLiteralExpr is a valid JSON model
-        boolean foundJSONModel = jsonStringStrategy.parse((StringLiteralExpr) node, path, jsonModels);
-        /*
-        if (foundJSONModel) {
-            return;
-        }
-        */
+        path = Utils.getPathForNode(node);
 
         // Check if StringLiteralExpr is a valid API URL
-        boolean foundAPIURL = apiurlStrategy.extract(((StringLiteralExpr) node).getValue(), this.project, null);
+        boolean foundAPIURL = apiurlStrategy.extract(((StringLiteralExpr) node).getValue(), this.project, null,
+                "noLib.StringLiteralExpr", path);
+        if (foundAPIURL) {
+            return;
+        }
+
+        // Check if StringLiteralExpr is a valid JSON model
+        boolean foundJSONModel = jsonStringStrategy.parse((StringLiteralExpr) node, path, jsonModels);
     }
 
     private void analyzeBinaryExpr(Node node, String path) {
@@ -366,24 +366,17 @@ public class ProjectAnalyzer implements Runnable {
             return;
         }
 
-        boolean isValidURL = apiurlStrategy.extract(assembledStrings, this.project);
+        path = Utils.getPathForNode(node);
 
-        if (isValidURL) {
-            return;
-        }
+        boolean isValidURL = apiurlStrategy.extract(assembledStrings, this.project, "noLib.StringLiteralExpr", path);
 
-        boolean isValidJSON = jsonStringStrategy.extract(assembledStrings, this.project);
-
-        // Check if BinaryExpr is a valid JSON model
-        //boolean foundJSONModel = jsonStringStrategy.parse((BinaryExpr) node, path, jsonModels);
         /*
-        if (foundJSONModel) {
+        if (isValidURL) {
             return;
         }
         */
 
-        //Check if BinaryExpr is a valid API URL
-        //boolean foundAPIURL = apiurlStrategy.extract((BinaryExpr) node, this.project);
+        boolean isValidJSON = jsonStringStrategy.extract(assembledStrings, this.project, "noLib.BinaryExpr", path);
     }
 
     private void analyzeObjectCreationExpr(Node node, String path, String name) {
@@ -531,13 +524,16 @@ public class ProjectAnalyzer implements Runnable {
                     return;
                 }
 
-                boolean isValidURL = apiurlStrategy.extract(assembledStrings, this.project);
+                path = Utils.getPathForNode(node);
+
+                boolean isValidURL = apiurlStrategy.extract(assembledStrings, this.project, "noLib.ConcatString", path);
 
                 if (isValidURL) {
                     return;
                 }
 
-                boolean isValidJSON = jsonStringStrategy.extract(assembledStrings, this.project);
+                boolean isValidJSON = jsonStringStrategy.extract(assembledStrings, this.project,
+                        "noLib.ConcatString", path);
                 break;
             case "build":
                 okHttpStrategy.extract((MethodCallExpr) node, null);
@@ -665,6 +661,7 @@ public class ProjectAnalyzer implements Runnable {
         for (Map.Entry<String, JSONRoot> jsonRootEntry : this.jsonModels.entrySet()) {
             //System.out.println("ID: " + jsonRootEntry.getKey() + "\n" + jsonRootEntry.getValue().toString());
             System.out.println("ID: " + jsonRootEntry.getKey() + "\n" + jsonRootEntry.getValue().formatJSON());
+            System.out.println("Detail info: " + jsonRootEntry.getValue().getJSONDetails());
         }
 
         System.out.println(project.apiURLs.size() + " detected base API URLs:");

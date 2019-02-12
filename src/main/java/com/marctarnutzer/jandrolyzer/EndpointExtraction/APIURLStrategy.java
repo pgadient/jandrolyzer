@@ -11,6 +11,7 @@ import com.github.javaparser.ast.expr.ObjectCreationExpr;
 import com.marctarnutzer.jandrolyzer.Models.APIEndpoint;
 import com.marctarnutzer.jandrolyzer.Models.APIURL;
 import com.marctarnutzer.jandrolyzer.Models.Project;
+import com.marctarnutzer.jandrolyzer.Utils;
 import okhttp3.HttpUrl;
 
 import java.util.*;
@@ -24,13 +25,15 @@ public class APIURLStrategy {
         ExpressionValueExtraction.project = project;
     }
 
-    public boolean extract(String potentialURL, Project project, String httpMethod) {
+    public boolean extract(String potentialURL, Project project, String httpMethod, String libraryName, String path) {
         String urlScheme = getScheme(potentialURL);
         if (urlScheme == null) {
             return false;
         }
 
         APIURL apiurl = new APIURL(urlScheme);
+        apiurl.library = libraryName;
+        apiurl.path = path;
         potentialURL = potentialURL.replaceFirst(urlScheme, "");
 
         potentialURL = extractAuthority(potentialURL, apiurl);
@@ -48,12 +51,12 @@ public class APIURLStrategy {
         return true;
     }
 
-    public boolean extract(List<String> potentialURLs, Project project) {
+    public boolean extract(List<String> potentialURLs, Project project, String libraryName, String path) {
         boolean foundValidURL = false;
 
         for (String potentialURL : potentialURLs) {
             System.out.println("Checking for URL: " + potentialURL);
-            foundValidURL = extract(potentialURL, project, null) || foundValidURL;
+            foundValidURL = extract(potentialURL, project, null, libraryName, path) || foundValidURL;
         }
 
         return foundValidURL;
@@ -65,12 +68,14 @@ public class APIURLStrategy {
     public void extract(ObjectCreationExpr objectCreationExpr, Project project) {
         List<String> toCheck = ExpressionValueExtraction.extractURLValue(objectCreationExpr);
 
-        if (toCheck == null) {
+        if (toCheck == null || objectCreationExpr == null) {
             return;
         }
 
+        String path = Utils.getPathForNode(objectCreationExpr);
+
         for (String tc : toCheck) {
-            extract(tc, project, null);
+            extract(tc, project, null, "noLib.URL", path);
         }
     }
 
@@ -81,7 +86,6 @@ public class APIURLStrategy {
             return true;
         }
     }
-
 
     private void addAPIURLToProject(Project project, String baseURL, APIURL apiurl) {
         if (project.apiURLs.containsKey(baseURL)) {

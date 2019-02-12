@@ -24,6 +24,7 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.marctarnutzer.jandrolyzer.DeclarationLocator;
 import com.marctarnutzer.jandrolyzer.Models.Project;
 import com.marctarnutzer.jandrolyzer.RequestStructureExtraction.MoshiGSONStrategy;
+import com.marctarnutzer.jandrolyzer.Utils;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -113,14 +114,16 @@ public class RetrofitStrategy {
                 return false;
             }
 
-            return extractInterfaceAPIURLs(interfaceDeclaration, baseUrls, converterKind);
+            String path = Utils.getPathForNode(methodCallExpr);
+
+            return extractInterfaceAPIURLs(interfaceDeclaration, baseUrls, converterKind, path);
         }
 
         return false;
     }
 
     private boolean extractInterfaceAPIURLs(ClassOrInterfaceDeclaration interfaceDeclaration, List<String> baseUrls,
-                                            String converterKind) {
+                                            String converterKind, String path) {
         List<MethodDeclaration> methodDeclarations = interfaceDeclaration.findAll(MethodDeclaration.class);
 
         List<String> apiEndpoints = new LinkedList<>();
@@ -218,7 +221,8 @@ public class RetrofitStrategy {
             System.out.println("URLs to check: " + fullURLs);
 
             for (String url : fullURLs) {
-                extractedValidAPIURL = apiurlStrategy.extract(url, project, httpMethod) || extractedValidAPIURL;
+                extractedValidAPIURL = apiurlStrategy.extract(url, project, httpMethod, "Retrofit", path)
+                        || extractedValidAPIURL;
             }
         }
 

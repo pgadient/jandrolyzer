@@ -74,9 +74,12 @@ public class OkHttpStrategy {
 
             System.out.println("HttpUrl to check: " + stringsToCheck);
 
+            String path = Utils.getPathForNode(methodCallExpr);
+
             boolean foundValidURLs = false;
             for (String extractedURL : stringsToCheck) {
-                foundValidURLs = apiurlStrategy.extract(extractedURL, project, httpMethod) || foundValidURLs;
+                foundValidURLs = apiurlStrategy.extract(extractedURL, project, httpMethod, "OkHttp", path)
+                        || foundValidURLs;
             }
 
             return foundValidURLs;
@@ -153,9 +156,12 @@ public class OkHttpStrategy {
 
             System.out.println("Extracted OkHttp URLs: " + extractedUrls);
 
+            String path = Utils.getPathForNode(variableDeclarator);
+
             boolean foundValidURLs = false;
             for (String extractedURL : extractedUrls) {
-                foundValidURLs = apiurlStrategy.extract(extractedURL, project, null) || foundValidURLs;
+                foundValidURLs = apiurlStrategy.extract(extractedURL, project, null, "OkHttp", path)
+                        || foundValidURLs;
             }
 
             return foundValidURLs;
@@ -231,7 +237,7 @@ public class OkHttpStrategy {
                 }
 
                 for (String bodyValue : bodyValues) {
-                    jsonStringStrategy.parse(bodyValue, path, project.jsonModels);
+                    jsonStringStrategy.parse(bodyValue, path, project.jsonModels, "OkHttp");
                 }
             }
 

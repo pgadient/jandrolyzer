@@ -151,6 +151,20 @@ public class APIAnalyzer {
             writer.newLine();
         }
 
+        writer.write("JSON DETAILS:");
+        writer.newLine();
+
+        for (JSONRoot jsonRoot : project.jsonModels.values()) {
+            writer.write(jsonRoot.getJSONDetails());
+        }
+
+        writer.write("URL DETAILS:");
+        writer.newLine();
+
+        for (APIURL apiurl : project.apiURLs.values()) {
+            writer.write(apiurl.toString());
+        }
+
         writer.write("SNIPPETS:");
         writer.newLine();
 
