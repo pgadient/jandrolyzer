@@ -114,7 +114,7 @@ public class MoshiGSONStrategy {
 
         analyzeFields(new HashSet<>(resolvedReferenceTypeDeclaration.getDeclaredFields()), modelPath,
                 resolvedReferenceTypeDeclaration.getName(),
-                project.jsonModels, null, null);
+                project.jsonModels, null, null, 0);
     }
 
     private void jsonObjectExtraction(Node node, String path, Map<String, JSONRoot> jsonModels) {
@@ -182,7 +182,7 @@ public class MoshiGSONStrategy {
                                             analyzeFields(declaratorType.asClassOrInterfaceType().resolve()
                                                     .getDeclaredFields(), modelPath,
                                                     declaratorType.asClassOrInterfaceType().getName().asString(),
-                                                    jsonModels, null, null);
+                                                    jsonModels, null, null, 0);
                                         }
                                     } else {
                                         System.out.println("Node is not a VariableDeclarator nor FieldDeclaration" +
@@ -206,7 +206,7 @@ public class MoshiGSONStrategy {
 
                                         analyzeFields(type.asClassOrInterfaceType().resolve().getDeclaredFields(), modelPath,
                                                 type.asClassOrInterfaceType().getName().asString(),
-                                                jsonModels, null, null);
+                                                jsonModels, null, null, 0);
                                     }
                                 } catch (Exception e) {
                                     System.out.println("Error while resolving ClassExpr type: " + e);
@@ -228,7 +228,13 @@ public class MoshiGSONStrategy {
 
     private void analyzeFields(Set<ResolvedFieldDeclaration> resolvedFieldDeclarations, String modelPath,
                                String className, Map<String, JSONRoot> jsonModels, JSONRoot jsonRoot,
-                               JSONObject jsonObject) {
+                               JSONObject jsonObject, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return;
+        }
+        depthLevel++;
+
         System.out.println("Analyzing fields in: " + modelPath);
 
         // Check if @Expose annotation is used
@@ -368,7 +374,7 @@ public class MoshiGSONStrategy {
                                                 "java.lang.String"));
                                     } else {
                                         analyzeFields(resolvedTypeArgType.asReferenceType().getDeclaredFields(), modelPath,
-                                                className, jsonModels, null, toInsert);
+                                                className, jsonModels, null, toInsert, depthLevel);
                                     }
                                 } else if (resolvedTypeArgType.isPrimitive()) {
                                     String valueType = resolvedTypeArgType.asPrimitive().getBoxTypeQName();
@@ -411,7 +417,7 @@ public class MoshiGSONStrategy {
                                             JSONObject jsonArrayElement = new JSONObject(JSONDataType.OBJECT, null, null);
                                             toInsert.linkedHashMap.put("", jsonArrayElement);
                                             analyzeFields(resolvedSecondTypeArgumentType.asReferenceType().getDeclaredFields(),
-                                                    modelPath, className, jsonModels, null, jsonArrayElement);
+                                                    modelPath, className, jsonModels, null, jsonArrayElement, depthLevel);
                                         }
                                     } else if (resolvedSecondTypeArgumentType.isPrimitive()) {
                                         String valueType = resolvedSecondTypeArgumentType.asPrimitive().getBoxTypeQName();
@@ -432,7 +438,7 @@ public class MoshiGSONStrategy {
                         } else {
                             toInsert = new JSONObject(JSONDataType.OBJECT, null, null);
                             analyzeFields(resolvedType.asReferenceType().getDeclaredFields(), modelPath, className, jsonModels
-                                    , null, toInsert);
+                                    , null, toInsert, depthLevel);
                         }
                     } catch (Exception e) {
                         System.out.println("Error while analyzing field: " + e);

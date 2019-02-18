@@ -285,7 +285,7 @@ public class RetrofitStrategy {
                 return null;
             }
 
-            List<String> baseUrls = ExpressionValueExtraction.getExpressionValue(scope.asMethodCallExpr().getArgument(0), null);
+            List<String> baseUrls = ExpressionValueExtraction.getExpressionValue(scope.asMethodCallExpr().getArgument(0), null, 0);
             if (baseUrls == null || baseUrls.isEmpty()) {
                 return null;
             }

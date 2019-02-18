@@ -55,6 +55,9 @@ public class Main {
     @Parameter(names = {"-decompilation_only", "-do"}, description = "Run decompilation only")
     private static boolean decompilationOnly = false;
 
+    @Parameter(names = {"-recursion_depth", "-rd"}, description = "Set max allowed recursion depth")
+    public static int maxRecursionDepth = -1;
+
     // HashSet not ordered according to insertion order
     static HashMap<String, HashSet<String>> libraries;
 
@@ -134,6 +137,8 @@ public class Main {
     }
 
     static void analyzeSingleProject(String projectPath, String librariesPath) {
+        System.out.println("Recursion depth: " + maxRecursionDepth);
+
         List<Project> projects = new LinkedList<>();
 
         try {

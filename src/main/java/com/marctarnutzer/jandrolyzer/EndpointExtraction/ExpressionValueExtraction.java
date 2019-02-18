@@ -27,11 +27,8 @@ import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParse
 import com.github.javaparser.symbolsolver.javaparsermodel.declarations.JavaParserSymbolDeclaration;
 import com.github.javaparser.symbolsolver.reflectionmodel.ReflectionFieldDeclaration;
 import com.github.javaparser.symbolsolver.reflectionmodel.ReflectionMethodDeclaration;
-import com.marctarnutzer.jandrolyzer.AssignmentLocator;
-import com.marctarnutzer.jandrolyzer.DeclarationLocator;
+import com.marctarnutzer.jandrolyzer.*;
 import com.marctarnutzer.jandrolyzer.Models.Project;
-import com.marctarnutzer.jandrolyzer.TypeEstimator;
-import com.marctarnutzer.jandrolyzer.Utils;
 
 import java.util.*;
 
@@ -44,7 +41,13 @@ public class ExpressionValueExtraction {
      *
      * Returns list of value Strings or null if an error occurred
      */
-    public static List<String> extractURLValue(ObjectCreationExpr objectCreationExpr) {
+    public static List<String> extractURLValue(ObjectCreationExpr objectCreationExpr, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return null;
+        }
+        depthLevel++;
+
         ResolvedType resolvedType;
         try {
             resolvedType = objectCreationExpr.calculateResolvedType();
@@ -64,10 +67,10 @@ public class ExpressionValueExtraction {
         List<String> toReturn = new LinkedList<>();
 
         if (objectCreationExpr.getArguments().size() == 1) {
-            toReturn = getExpressionValue(objectCreationExpr.getArgument(0), null);
+            toReturn = getExpressionValue(objectCreationExpr.getArgument(0), null, depthLevel);
         } else if (objectCreationExpr.getArguments().size() == 2) {
-            List<String> context = getExpressionValue(objectCreationExpr.getArgument(0), null);
-            List<String> spec = getExpressionValue(objectCreationExpr.getArgument(1), null);
+            List<String> context = getExpressionValue(objectCreationExpr.getArgument(0), null, depthLevel);
+            List<String> spec = getExpressionValue(objectCreationExpr.getArgument(1), null, depthLevel);
 
             if (context == null || context.isEmpty()
                     || spec == null || spec.isEmpty()) {
@@ -80,9 +83,9 @@ public class ExpressionValueExtraction {
                 }
             }
         } else if (objectCreationExpr.getArguments().size() == 3) {
-            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0), null);
-            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1), null);
-            List<String> file = getExpressionValue(objectCreationExpr.getArgument(2), null);
+            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0), null, depthLevel);
+            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1), null, depthLevel);
+            List<String> file = getExpressionValue(objectCreationExpr.getArgument(2), null, depthLevel);
 
             if (protocols == null || protocols.isEmpty()
                     || host == null || host.isEmpty() ||
@@ -98,10 +101,10 @@ public class ExpressionValueExtraction {
                 }
             }
         } else if (objectCreationExpr.getArguments().size() == 4) {
-            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0), null);
-            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1), null);
-            List<String> port = getExpressionValue(objectCreationExpr.getArgument(2), null);
-            List<String> file = getExpressionValue(objectCreationExpr.getArgument(3), null);
+            List<String> protocols = getExpressionValue(objectCreationExpr.getArgument(0), null, depthLevel);
+            List<String> host = getExpressionValue(objectCreationExpr.getArgument(1), null, depthLevel);
+            List<String> port = getExpressionValue(objectCreationExpr.getArgument(2), null, depthLevel);
+            List<String> file = getExpressionValue(objectCreationExpr.getArgument(3), null, depthLevel);
 
             if (protocols == null || protocols.isEmpty()
                     || host == null || host.isEmpty()
@@ -128,13 +131,19 @@ public class ExpressionValueExtraction {
         }
     }
 
-    public static List<String> extractStringConcatValue(MethodCallExpr methodCallExpr, Set<Node> seenExpressions) {
+    public static List<String> extractStringConcatValue(MethodCallExpr methodCallExpr, Set<Node> seenExpressions, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return null;
+        }
+        depthLevel++;
+
         if (methodCallExpr.getArguments().size() != 1 || !methodCallExpr.getScope().isPresent()) {
             return null;
         }
 
         Expression scope = methodCallExpr.getScope().get();
-        List<String> toCheck = getExpressionValue(methodCallExpr.getArgument(0), seenExpressions);
+        List<String> toCheck = getExpressionValue(methodCallExpr.getArgument(0), seenExpressions, depthLevel);
 
         if (toCheck == null || !(scope.isMethodCallExpr() || scope.isNameExpr() || scope.isFieldAccessExpr())) {
             return null;
@@ -142,9 +151,9 @@ public class ExpressionValueExtraction {
 
         List<String> prePath = null;
         if (scope.isMethodCallExpr()) {
-            prePath = extractStringConcatValue((MethodCallExpr) scope, seenExpressions);
+            prePath = extractStringConcatValue((MethodCallExpr) scope, seenExpressions, depthLevel);
         } else if (scope.isNameExpr() || scope.isFieldAccessExpr()) {
-            prePath = getExpressionValue(scope, seenExpressions);
+            prePath = getExpressionValue(scope, seenExpressions, depthLevel);
         }
 
         List<String> toReturn = new LinkedList<>();
@@ -161,14 +170,14 @@ public class ExpressionValueExtraction {
         return toReturn;
     }
 
-    public static List<String> extractStringBuilderValue(VariableDeclarator variableDeclarator, Project project) {
+    public static List<String> extractStringBuilderValue(VariableDeclarator variableDeclarator, Project project, int depthLevel) {
         Node containingNode = Utils.getParentClassOrMethod(variableDeclarator);
 
         List<String> potentialApiURLs = new LinkedList<>();
         if (containingNode instanceof MethodDeclaration) {
             List<MethodCallExpr> methodCallExprs = containingNode.findAll(MethodCallExpr.class);
             System.out.println("Extracting StringBuilder values in MethodDeclaration");
-            potentialApiURLs = reconstructStringBuilderStringsIn(methodCallExprs, variableDeclarator);
+            potentialApiURLs = reconstructStringBuilderStringsIn(methodCallExprs, variableDeclarator, depthLevel);
             System.out.println("Finished extracting StringBuilder values");
         } else if (containingNode instanceof ClassOrInterfaceDeclaration) {
             if (variableDeclarator.getParentNode().isPresent() && variableDeclarator.getParentNode().get()
@@ -188,7 +197,7 @@ public class ExpressionValueExtraction {
                 System.out.println("Extracting StringBuilder values in MethodDeclarations: " + methodDeclarations.size());
                 for (MethodDeclaration methodDeclaration : methodDeclarations) {
                     List<MethodCallExpr> methodCallExprs = methodDeclaration.findAll(MethodCallExpr.class);
-                    potentialApiURLs.addAll(reconstructStringBuilderStringsIn(methodCallExprs, fieldNode));
+                    potentialApiURLs.addAll(reconstructStringBuilderStringsIn(methodCallExprs, fieldNode, depthLevel));
                 }
                 System.out.println("Finished extracting StringBuilder values in MethodDeclarations");
             }
@@ -202,7 +211,13 @@ public class ExpressionValueExtraction {
     }
 
     public static List<String> reconstructStringBuilderStringsIn(List<MethodCallExpr> methodCallExprs,
-                                                           Node variableOrFieldNode) {
+                                                           Node variableOrFieldNode, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return null;
+        }
+        depthLevel++;
+
         List<String> potentialApiURLs = new LinkedList<>();
         Stack<List<String>> chainedValuesStack = new Stack<>();
         for (MethodCallExpr methodCallExpr : methodCallExprs) {
@@ -269,7 +284,7 @@ public class ExpressionValueExtraction {
 
                         List<MethodCallExpr> mMethodCallExpr = methodDeclaration.findAll(MethodCallExpr.class);
                         System.out.println("Reconstructing StringBuilder string from methodCallExpr");
-                        List<String> sbValues = reconstructStringBuilderStringsIn(mMethodCallExpr, methodDeclaration.getParameter(parameterNbr));
+                        List<String> sbValues = reconstructStringBuilderStringsIn(mMethodCallExpr, methodDeclaration.getParameter(parameterNbr), depthLevel);
                         System.out.println("Reconstruct StringBuilder string from methodCallExpr finished, size: " + sbValues.size());
 
                         if (sbValues.isEmpty()) {
@@ -360,7 +375,7 @@ public class ExpressionValueExtraction {
                     continue;
                 }
 
-                List<String> appendValues = getExpressionValue(methodCallExpr.getArguments().get(0), null);
+                List<String> appendValues = getExpressionValue(methodCallExpr.getArguments().get(0), null, depthLevel);
                 if (appendValues == null || appendValues.isEmpty()) {
                     continue;
                 }
@@ -414,7 +429,13 @@ public class ExpressionValueExtraction {
         return potentialApiURLs;
     }
 
-    public static List<String> serializeBinaryExpr(BinaryExpr binaryExpr, Set<Node> seenExpressions) {
+    public static List<String> serializeBinaryExpr(BinaryExpr binaryExpr, Set<Node> seenExpressions, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return null;
+        }
+        depthLevel++;
+
         List<String> toReturn = new ArrayList<>();
 
         if (!binaryExpr.getOperator().asString().equals("+")) {
@@ -426,13 +447,13 @@ public class ExpressionValueExtraction {
         Expression rightExpression = binaryExpr.getRight();
 
         if (leftExpression.isBinaryExpr()) {
-            toReturn = serializeBinaryExpr(leftExpression.asBinaryExpr(), seenExpressions);
+            toReturn = serializeBinaryExpr(leftExpression.asBinaryExpr(), seenExpressions, depthLevel);
         } else if (leftExpression.isStringLiteralExpr()) {
             toReturn = Arrays.asList(leftExpression.asStringLiteralExpr().getValue());
         } else if (leftExpression.isNameExpr()) {
-            toReturn = getExpressionValue(leftExpression.asNameExpr(), seenExpressions);
+            toReturn = getExpressionValue(leftExpression.asNameExpr(), seenExpressions, depthLevel);
         } else {
-            toReturn = getExpressionValue(leftExpression, seenExpressions);
+            toReturn = getExpressionValue(leftExpression, seenExpressions, depthLevel);
         }
 
         if (toReturn == null) {
@@ -442,7 +463,7 @@ public class ExpressionValueExtraction {
         if (rightExpression.isBinaryExpr()) {
             List<String> appendedPaths = new ArrayList<>();
             for (String path : toReturn) {
-                List<String> serializedBinaryExprPaths = serializeBinaryExpr(rightExpression.asBinaryExpr(), seenExpressions);
+                List<String> serializedBinaryExprPaths = serializeBinaryExpr(rightExpression.asBinaryExpr(), seenExpressions, depthLevel);
                 if (serializedBinaryExprPaths == null) {
                     return null;
                 }
@@ -462,7 +483,7 @@ public class ExpressionValueExtraction {
         } else if (rightExpression.isNameExpr()) {
             List<String> appendedPaths = new ArrayList<>();
             for (String path: toReturn) {
-                List<String> serializedNameExprPaths = getExpressionValue(rightExpression.asNameExpr(), seenExpressions);
+                List<String> serializedNameExprPaths = getExpressionValue(rightExpression.asNameExpr(), seenExpressions, depthLevel);
                 if (serializedNameExprPaths == null) {
                     return null;
                 }
@@ -476,7 +497,7 @@ public class ExpressionValueExtraction {
         } else {
             List<String> appendPaths = new ArrayList<>();
             for (String path : toReturn) {
-                List<String> toAdd = getExpressionValue(rightExpression, seenExpressions);
+                List<String> toAdd = getExpressionValue(rightExpression, seenExpressions, depthLevel);
                 if (toAdd == null) {
                     return null;
                 }
@@ -531,12 +552,18 @@ public class ExpressionValueExtraction {
         return contains;
     }
 
-    public static List<String> getExpressionValue(Expression expression, Set<Node> seenExpressions) {
+    public static List<String> getExpressionValue(Expression expression, Set<Node> seenExpressions, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return null;
+        }
+        depthLevel++;
+
         System.out.println("Getting value of expression: " + expression);
 
         if (expression.isNameExpr()) {
             System.out.println("NameExpr found: " + expression);
-            List<Node> assignedNodes = AssignmentLocator.nameExprGetLastAssignedNode(expression.asNameExpr(), project);
+            List<Node> assignedNodes = AssignmentLocator.nameExprGetLastAssignedNode(expression.asNameExpr(), project, 0);
             List<String> toReturn = new LinkedList<>();
             System.out.println("Assigned nodes to check: " + assignedNodes);
 
@@ -583,7 +610,7 @@ public class ExpressionValueExtraction {
                         continue;
                     }
                     System.out.println("Assigned expression: " + assignedNode);
-                    List<String> toAdd = getExpressionValue((Expression) assignedNode, seenExpressions);
+                    List<String> toAdd = getExpressionValue((Expression) assignedNode, seenExpressions, depthLevel);
                     if (toAdd != null) {
                         toReturn.addAll(toAdd);
                     }
@@ -615,12 +642,12 @@ public class ExpressionValueExtraction {
         } else if (expression.isNullLiteralExpr()) {
             return Arrays.asList("null");
         } else if (expression.isBinaryExpr()) {
-            return serializeBinaryExpr(expression.asBinaryExpr(), seenExpressions);
+            return serializeBinaryExpr(expression.asBinaryExpr(), seenExpressions, depthLevel);
         } else if (expression.isMethodCallExpr()) {
             System.out.println("MethodCallExpr found: " + expression);
 
             if (expression.asMethodCallExpr().getName().asString().equals("concat")) {
-                return extractStringConcatValue(expression.asMethodCallExpr(), seenExpressions);
+                return extractStringConcatValue(expression.asMethodCallExpr(), seenExpressions, depthLevel);
             } else {
                 ResolvedMethodDeclaration resolvedMethodDeclaration = null;
                 try {
@@ -691,7 +718,7 @@ public class ExpressionValueExtraction {
                         continue;
                     }
 
-                    List<String> returnExprResult = getExpressionValue(returnStmt.getExpression().get(), seenExpressions);
+                    List<String> returnExprResult = getExpressionValue(returnStmt.getExpression().get(), seenExpressions, depthLevel);
 
                     if (returnExprResult == null) {
                         continue;
@@ -713,7 +740,7 @@ public class ExpressionValueExtraction {
             }
         } else if (expression.isObjectCreationExpr()) {
             if (expression.asObjectCreationExpr().getType().getName().asString().equals("URL")) {
-                return extractURLValue(expression.asObjectCreationExpr());
+                return extractURLValue(expression.asObjectCreationExpr(), depthLevel);
             }
         } else if (expression.isFieldAccessExpr()) {
             System.out.println("Field expression found: " + expression);
@@ -747,7 +774,7 @@ public class ExpressionValueExtraction {
                     }
 
                     if (variableDeclarator.getInitializer().isPresent()) {
-                        return getExpressionValue(variableDeclarator.getInitializer().get(), seenExpressions);
+                        return getExpressionValue(variableDeclarator.getInitializer().get(), seenExpressions, depthLevel);
                     }
                 }
             } else if (resolvedValueDeclaration instanceof ReflectionFieldDeclaration) {
@@ -787,232 +814,4 @@ public class ExpressionValueExtraction {
 
         return null;
     }
-
-    /*
-    public static List<String> getExpressionValue2(Expression expression) {
-        System.out.println("Getting value of expression: " + expression);
-
-        if (expression.isNameExpr()) {
-            ResolvedValueDeclaration resolvedValueDeclaration;
-            try {
-                resolvedValueDeclaration = expression.asNameExpr().resolve();
-            } catch (Exception e) {
-                System.out.println("Error resolving NameExpr: " + e);
-                return null;
-            }
-
-            System.out.println("ResolvedValueDec: " + resolvedValueDeclaration);
-
-            if (resolvedValueDeclaration.isVariable()) {
-                // TODO: Check if I even need this...
-                System.out.println("Found a variable");
-            } else if (resolvedValueDeclaration.isField()) {
-                Node declarationNode = ((JavaParserFieldDeclaration) resolvedValueDeclaration.asField())
-                        .getWrappedNode();
-
-                if (((FieldDeclaration) declarationNode).asFieldDeclaration().getVariables().size() == 1) {
-                    VariableDeclarator variableDeclarator = ((FieldDeclaration) declarationNode)
-                            .asFieldDeclaration().getVariables().get(0);
-                    if (variableDeclarator.getInitializer().isPresent()) {
-                        if (variableDeclarator.getInitializer().get().isStringLiteralExpr()) {
-                            return Arrays.asList(variableDeclarator.getInitializer().get().asStringLiteralExpr().getValue());
-                        } else {
-                            return getExpressionValue2(variableDeclarator.getInitializer().get());
-                        }
-                    }
-                }
-            } else if (resolvedValueDeclaration.isParameter()) {
-                Node declarationNode = (((JavaParserParameterDeclaration) resolvedValueDeclaration.asParameter())
-                        .getWrappedNode());
-                System.out.println("Declaration node: " + declarationNode + ", parameter type: "
-                        + resolvedValueDeclaration.asParameter().getType());
-
-                if (!((JavaParserParameterDeclaration) resolvedValueDeclaration.asParameter()).getWrappedNode().getParentNode().isPresent()) {
-                    return null;
-                }
-
-                Node parentNode = ((JavaParserParameterDeclaration) resolvedValueDeclaration.asParameter()).getWrappedNode().getParentNode().get();
-                System.out.println("Parent node: " + parentNode);
-
-                if (!(parentNode instanceof MethodDeclaration)) {
-                    return null;
-                }
-
-                MethodDeclaration methodDeclaration = (MethodDeclaration) parentNode;
-
-                if (!methodDeclaration.findCompilationUnit().isPresent()) {
-                    return null;
-                }
-
-                List<MethodCallExpr> methodCallExprs = new LinkedList<>();
-
-                if (methodDeclaration.isPublic()) {
-                    for (CompilationUnit cu : project.compilationUnits) {
-                        methodCallExprs.addAll(cu.findAll(MethodCallExpr.class));
-                    }
-                } else {
-                    methodCallExprs = methodDeclaration.findCompilationUnit().get().findAll(MethodCallExpr.class);
-                }
-
-                List<String> toReturn = new ArrayList<>();
-                for (MethodCallExpr methodCallExpr : methodCallExprs) {
-                    if (methodCallExpr.getName().asString().equals(methodDeclaration.getNameAsString())) {
-                        System.out.println("Found matching method call in compilation unit: " + methodCallExpr);
-
-                        String methodCallExprQSignature;
-                        String methodDeclarationQSignature;
-                        int parameterPosition = 0;
-                        try {
-                            methodCallExprQSignature = methodCallExpr.resolve().getQualifiedSignature();
-                            ResolvedMethodDeclaration resolvedMethodDeclaration = methodDeclaration.resolve();
-                            methodDeclarationQSignature = resolvedMethodDeclaration.getQualifiedSignature();
-
-                            for (int i = 0; i < resolvedMethodDeclaration.getNumberOfParams(); i++) {
-                                if (resolvedMethodDeclaration.getParam(i).hasName() && resolvedMethodDeclaration
-                                        .getParam(i).getName().equals(resolvedValueDeclaration.getName())) {
-                                    parameterPosition = i;
-                                    break;
-                                }
-                            }
-                        } catch (Exception e) {
-                            System.out.println("Signatures could not be determined: " + e);
-                            return null;
-                        }
-
-                        if (methodCallExprQSignature.equals(methodDeclarationQSignature)) {
-                            System.out.println("Signatures match: " + methodCallExprQSignature
-                                    + "parameter position: " + parameterPosition);
-                            List<String> expressionValues = getExpressionValue2(methodCallExpr.getArgument(parameterPosition));
-                            if (expressionValues != null) {
-                                toReturn.addAll(expressionValues);
-                            }
-                        } else {
-                            System.out.println("Signatures don't match: " + methodCallExpr.resolve().getQualifiedSignature() + ", and: " + methodDeclaration.resolve().getQualifiedSignature());
-                        }
-                    }
-                }
-
-                if (toReturn.size() == 0) {
-                    System.out.println("Method " + methodDeclaration.getNameAsString() +
-                            " is either not used or called from another class.");
-                    // TODO: Deal with this...
-                    return null;
-                }
-
-                return toReturn;
-            } else if (resolvedValueDeclaration instanceof JavaParserSymbolDeclaration) {
-                System.out.println("Found JavaParserSymbolDeclaration");
-                Node declarationNode = ((JavaParserSymbolDeclaration) resolvedValueDeclaration).getWrappedNode();
-                if (declarationNode instanceof VariableDeclarator) {
-                    if (((VariableDeclarator) declarationNode).getInitializer().isPresent()) {
-                        return getExpressionValue2(((VariableDeclarator) declarationNode).getInitializer().get());
-                    }
-                }
-            }
-        } else if (expression.isStringLiteralExpr()) {
-            return Arrays.asList(expression.asStringLiteralExpr().getValue());
-        } else if (expression.isIntegerLiteralExpr()) {
-            return Arrays.asList(expression.asIntegerLiteralExpr().getValue());
-        } else if (expression.isBooleanLiteralExpr()) {
-            return Arrays.asList(Boolean.toString(expression.asBooleanLiteralExpr().getValue()));
-        } else if (expression.isDoubleLiteralExpr()) {
-            return Arrays.asList(expression.asDoubleLiteralExpr().getValue());
-        } else if (expression.isLongLiteralExpr()) {
-            return Arrays.asList(expression.asLongLiteralExpr().getValue());
-        } else if (expression.isNullLiteralExpr()) {
-            return Arrays.asList("null");
-        } else if (expression.isBinaryExpr()) {
-            return serializeBinaryExpr(expression.asBinaryExpr());
-        } else if (expression.isMethodCallExpr()) {
-            if (expression.asMethodCallExpr().getName().asString().equals("concat")) {
-                return extractStringConcatValue(expression.asMethodCallExpr());
-            } else {
-                ResolvedMethodDeclaration resolvedMethodDeclaration = null;
-                try {
-                    resolvedMethodDeclaration = expression.asMethodCallExpr().resolve();
-                } catch (Exception e) {
-                    System.out.println("Error resolving MethodCallExpr: " + e);
-                }
-
-                System.out.println("Resolved MethodCallExpr: " + resolvedMethodDeclaration);
-
-                if (resolvedMethodDeclaration == null) {
-                    return null;
-                }
-
-                if (resolvedMethodDeclaration instanceof ReflectionMethodDeclaration) {
-                    // TODO: Return type as string: <TYPE INFO>
-                    return null;
-                }
-
-                MethodDeclaration methodDeclaration = ((JavaParserMethodDeclaration) resolvedMethodDeclaration)
-                        .getWrappedNode();
-
-                methodDeclaration = DeclarationLocator.locate(methodDeclaration, MethodDeclaration.class);
-
-                List<ReturnStmt> returnStmts = methodDeclaration.findAll(ReturnStmt.class);
-                List<String> toReturn = new LinkedList<>();
-                for (ReturnStmt returnStmt : returnStmts) {
-                    System.out.println("Found return statement: " + returnStmt);
-
-                    List<String> returnExprResult = getExpressionValue2(returnStmt.getExpression().get());
-
-                    if (returnExprResult == null) {
-                        continue;
-                    }
-
-                    toReturn.addAll(returnExprResult);
-                }
-
-                if (toReturn == null || toReturn.isEmpty()) {
-                    return null;
-                }
-
-                return toReturn;
-            }
-        } else if (expression.isObjectCreationExpr()) {
-            if (expression.asObjectCreationExpr().getType().getName().asString().equals("URL")) {
-                return extractURLValue(expression.asObjectCreationExpr());
-            }
-        } else if (expression.isFieldAccessExpr()) {
-            System.out.println("Field expression found: " + expression);
-
-            ResolvedValueDeclaration resolvedValueDeclaration;
-            try {
-                resolvedValueDeclaration = expression.asFieldAccessExpr().resolve();
-            } catch (Exception e) {
-                System.out.println("Error resolving field access expression: " + e);
-                return null;
-            }
-
-            if (resolvedValueDeclaration instanceof JavaParserFieldDeclaration) {
-                Node declarationNode = ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode();
-
-                if (declarationNode instanceof FieldDeclaration) {
-                    VariableDeclarator variableDeclarator = null;
-                    for (VariableDeclarator vd : ((FieldDeclaration) declarationNode).getVariables()) {
-                        if (vd.getName().asString().equals(expression.asFieldAccessExpr().getName().asString())) {
-                            variableDeclarator = vd;
-                        }
-                    }
-
-                    if (variableDeclarator == null) {
-                        return null;
-                    }
-
-                    if (variableDeclarator.getInitializer().isPresent()) {
-                        return getExpressionValue2(variableDeclarator.getInitializer().get());
-                    }
-                }
-            } else {
-                System.out.println("Not a JavaParserFieldDeclaration: " + resolvedValueDeclaration);
-            }
-        } else {
-            System.out.println("NOT IMPLEMENTED: " + expression);
-        }
-
-        return null;
-    }
-    */
-
 }

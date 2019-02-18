@@ -42,6 +42,7 @@ public class ProjectAnalyzerTest {
 
         try {
             ProjectAnalyzer projectAnalyzer = new ProjectAnalyzer(projectPath, libraries, projects, 1, librariesPath);
+            Main.maxRecursionDepth = 15;
             projectAnalyzer.run();
         } catch (FileNotFoundException e) {
             e.printStackTrace();

@@ -203,7 +203,7 @@ public class OkHttpStrategy {
 
                 List<MethodCallExpr> requestBodyMCEs = new LinkedList<>();
                 if (bodyExpr.isNameExpr()) {
-                    List<Node> assignedNodes = AssignmentLocator.nameExprGetLastAssignedNode((NameExpr) bodyExpr, project);
+                    List<Node> assignedNodes = AssignmentLocator.nameExprGetLastAssignedNode((NameExpr) bodyExpr, project, 0);
 
                     System.out.println("Body assignment nodes: " + assignedNodes);
 
@@ -224,7 +224,7 @@ public class OkHttpStrategy {
                 List<String> bodyValues = new LinkedList<>();
                 for (MethodCallExpr requestBodyMCE : requestBodyMCEs) {
                     if (requestBodyMCE.getNameAsString().equals("create") && requestBodyMCE.getArguments().size() == 2) {
-                        bodyValues.addAll(ExpressionValueExtraction.getExpressionValue(requestBodyMCE.getArgument(1), null));
+                        bodyValues.addAll(ExpressionValueExtraction.getExpressionValue(requestBodyMCE.getArgument(1), null, 0));
                     }
                 }
 
@@ -265,7 +265,7 @@ public class OkHttpStrategy {
                 }
 
                 if (estimatedType.equals("okhttp3.HttpUrl") || estimatedType.equals("okhttp.HttpUrl")) {
-                    List<Node> assignedNodes= AssignmentLocator.nameExprGetLastAssignedNode(argument.asNameExpr(), project);
+                    List<Node> assignedNodes= AssignmentLocator.nameExprGetLastAssignedNode(argument.asNameExpr(), project, 0);
                     if (assignedNodes == null) {
                         return null;
                     }
@@ -493,7 +493,7 @@ public class OkHttpStrategy {
                             && methodCallExpr.getScope().get().asMethodCallExpr().getName().asString().equals("parse")
                             && methodCallExpr.getScope().get().asMethodCallExpr().getArguments().size() == 1) {
                         List<String> argValues = ExpressionValueExtraction.getExpressionValue(
-                                methodCallExpr.getScope().get().asMethodCallExpr().getArgument(0), null);
+                                methodCallExpr.getScope().get().asMethodCallExpr().getArgument(0), null, 0);
 
                         if (preString.isEmpty()) {
                             toReturn = argValues;
@@ -513,8 +513,8 @@ public class OkHttpStrategy {
                         return null;
                     }
 
-                    List<String> arg0Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null);
-                    List<String> arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1), null);
+                    List<String> arg0Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null, 0);
+                    List<String> arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1), null, 0);
 
                     System.out.println("Arg 0 values: " + arg0Values + ", arg 1 values: " + arg1Values);
 
@@ -555,7 +555,7 @@ public class OkHttpStrategy {
                         return null;
                     }
 
-                    List<String> argValues = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null);
+                    List<String> argValues = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null, 0);
 
                     System.out.println("Arg values: " + argValues);
 

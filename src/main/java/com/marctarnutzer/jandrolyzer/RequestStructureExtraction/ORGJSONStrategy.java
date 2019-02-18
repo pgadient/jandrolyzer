@@ -32,7 +32,7 @@ public class ORGJSONStrategy {
 
     private Project project;
 
-    public List<String> extract(VariableDeclarator variableDeclarator, Project project) {
+    public List<String> extract(VariableDeclarator variableDeclarator, Project project, int depthLevel) {
         this.project = project;
 
         if (variableDeclarator.getType().isClassOrInterfaceType()) {
@@ -55,7 +55,7 @@ public class ORGJSONStrategy {
                 String typeString = TypeEstimator.estimateTypeName(arg);
 
                 if (typeString != null && typeString.equals("java.lang.String")) {
-                    List<String> preStrings = ExpressionValueExtraction.getExpressionValue(arg, null);
+                    List<String> preStrings = ExpressionValueExtraction.getExpressionValue(arg, null, 0);
 
                     if (preStrings != null && !preStrings.isEmpty()) {
                         for (String preString : preStrings) {
@@ -80,7 +80,7 @@ public class ORGJSONStrategy {
 
                 List<List<String>> jsonStringLists = new LinkedList<>();
                 jsonStringLists.add(new LinkedList<>());
-                getValuesFromMethodCallExpr(methodCallExpr, jsonStringLists);
+                getValuesFromMethodCallExpr(methodCallExpr, jsonStringLists, depthLevel);
 
                 for (List<String> stringList : jsonStringLists) {
                     initStrings.addAll(stringList);
@@ -95,7 +95,7 @@ public class ORGJSONStrategy {
             if (containingNode instanceof MethodDeclaration) {
                 List<List<String>> jsonStringLists = new LinkedList<>();
                 jsonStringLists.add(initStrings);
-                extractJSONStringsFromMethod(containingNode, variableDeclarator, jsonStringLists, objectKind);
+                extractJSONStringsFromMethod(containingNode, variableDeclarator, jsonStringLists, objectKind, depthLevel);
                 for (List<String> jsonStringList : jsonStringLists) {
                     toCheck.addAll(jsonStringList);
                 }
@@ -118,7 +118,7 @@ public class ORGJSONStrategy {
                     for (MethodDeclaration methodDeclaration : methodDeclarations) {
                         List<List<String>> jsonStringLists = new LinkedList<>();
                         jsonStringLists.add(initStrings);
-                        extractJSONStringsFromMethod(methodDeclaration, fieldNode, jsonStringLists, objectKind);
+                        extractJSONStringsFromMethod(methodDeclaration, fieldNode, jsonStringLists, objectKind, depthLevel);
 
                         for (List<String> jsonStringList : jsonStringLists) {
                             toCheck.addAll(jsonStringList);
@@ -136,7 +136,13 @@ public class ORGJSONStrategy {
     }
 
     private void extractJSONStringsFromMethod(Node node, Node variableDeclarationNode,
-                                              List<List<String>> jsonStringLists, String objectKind) {
+                                              List<List<String>> jsonStringLists, String objectKind, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return;
+        }
+        depthLevel++;
+
         if (node instanceof MethodCallExpr) {
             MethodCallExpr methodCallExpr = ((MethodCallExpr) node);
             if (methodCallExpr.getNameAsString().equals("put") && methodCallExpr.getArguments().size() == 1
@@ -166,14 +172,14 @@ public class ORGJSONStrategy {
                             List<String> arg2Values = null;
                             String argKind = null;
                             if (objectKind.equals("JSONObject")) {
-                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null);
-                                arg2Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1), null);
+                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null, 0);
+                                arg2Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(1), null, 0);
 
                                 if (arg2Values == null) {
                                     if (methodCallExpr.getArgument(1).isNameExpr()) {
                                         NameExpr argNameExpr = methodCallExpr.getArgument(1).asNameExpr();
                                         List<String> preStrings = new LinkedList<>();
-                                        getValuesFromNameExpr(argNameExpr, preStrings);
+                                        getValuesFromNameExpr(argNameExpr, preStrings, depthLevel);
                                         if (!preStrings.isEmpty()) {
                                             arg2Values = preStrings;
                                             if (preStrings.get(0).startsWith("{")) {
@@ -185,13 +191,13 @@ public class ORGJSONStrategy {
                                     }
                                 }
                             } else {
-                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null);
+                                arg1Values = ExpressionValueExtraction.getExpressionValue(methodCallExpr.getArgument(0), null, 0);
 
                                 if (arg1Values == null) {
                                     if (methodCallExpr.getArgument(0).isNameExpr()) {
                                         NameExpr argNameExpr = methodCallExpr.getArgument(0).asNameExpr();
                                         List<String> preStrings = new LinkedList<>();
-                                        getValuesFromNameExpr(argNameExpr, preStrings);
+                                        getValuesFromNameExpr(argNameExpr, preStrings, depthLevel);
                                         if (!preStrings.isEmpty()) {
                                             arg1Values = preStrings;
                                             if (preStrings.get(0).startsWith("{")) {
@@ -394,7 +400,7 @@ public class ORGJSONStrategy {
                                 System.out.println("Found MethodDeclaration: " + methodDeclaration);
 
                                 extractJSONStringsFromMethod(methodDeclaration,
-                                        methodDeclaration.getParameter(position), jsonStringLists, objectKind);
+                                        methodDeclaration.getParameter(position), jsonStringLists, objectKind, depthLevel);
                             }
                         }
                     }
@@ -438,7 +444,7 @@ public class ORGJSONStrategy {
                                 String typeString = TypeEstimator.estimateTypeName(arg);
 
                                 if (typeString != null && typeString.equals("java.lang.String")) {
-                                    List<String> preValues = ExpressionValueExtraction.getExpressionValue(arg, null);
+                                    List<String> preValues = ExpressionValueExtraction.getExpressionValue(arg, null, 0);
 
                                     if (preValues != null && !preValues.isEmpty()) {
                                         for (String preValue : preValues) {
@@ -477,7 +483,7 @@ public class ORGJSONStrategy {
                             }
                             jsonStringLists.get(jsonStringLists.size() - 1).addAll(prevStrings);
 
-                            getValuesFromMethodCallExpr((MethodCallExpr) value, jsonStringLists);
+                            getValuesFromMethodCallExpr((MethodCallExpr) value, jsonStringLists, depthLevel);
                         }
                     }
                 } catch (Exception e) {
@@ -518,11 +524,11 @@ public class ORGJSONStrategy {
         }
 
         for (Node child : node.getChildNodes()) {
-            extractJSONStringsFromMethod(child, variableDeclarationNode, jsonStringLists, objectKind);
+            extractJSONStringsFromMethod(child, variableDeclarationNode, jsonStringLists, objectKind, depthLevel - 1);
         }
     }
 
-    private void getValuesFromNameExpr(NameExpr nameExpr, List<String> jsonStringList) {
+    private void getValuesFromNameExpr(NameExpr nameExpr, List<String> jsonStringList, int depthLevel) {
         try {
             ResolvedValueDeclaration resolvedValueDeclaration = nameExpr.resolve();
             if (resolvedValueDeclaration.getType().isReferenceType()) {
@@ -542,7 +548,7 @@ public class ORGJSONStrategy {
                         return;
                     }
 
-                    List<String> preStrings = extract((VariableDeclarator) declarationNode, project);
+                    List<String> preStrings = extract((VariableDeclarator) declarationNode, project, depthLevel);
 
                     if (preStrings != null && !preStrings.isEmpty()) {
                         System.out.println("JSONArray / JSONObject strings: " + preStrings);
@@ -555,7 +561,13 @@ public class ORGJSONStrategy {
         }
     }
 
-    private void getValuesFromMethodCallExpr(MethodCallExpr methodCallExpr, List<List<String>> jsonStringLists) {
+    private void getValuesFromMethodCallExpr(MethodCallExpr methodCallExpr, List<List<String>> jsonStringLists, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return;
+        }
+        depthLevel++;
+
         try {
             ResolvedMethodDeclaration resolvedMethodDeclaration = methodCallExpr.asMethodCallExpr().resolve();
 
@@ -610,7 +622,7 @@ public class ORGJSONStrategy {
                     if (declarationNode instanceof VariableDeclarator) {
                         System.out.println("DeclarationNode is VariableDeclarator");
 
-                        List<String> methodStrings = extract((VariableDeclarator) declarationNode, project);
+                        List<String> methodStrings = extract((VariableDeclarator) declarationNode, project, depthLevel);
 
                         if (methodStrings != null && !methodStrings.isEmpty()) {
                             System.out.println("Adding methodStrings");

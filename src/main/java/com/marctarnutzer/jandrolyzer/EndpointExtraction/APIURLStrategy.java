@@ -66,7 +66,7 @@ public class APIURLStrategy {
      * Extract API URLs from java.net.URL ObjectCreationExpr and save valid URLs in Project object
      */
     public void extract(ObjectCreationExpr objectCreationExpr, Project project) {
-        List<String> toCheck = ExpressionValueExtraction.extractURLValue(objectCreationExpr);
+        List<String> toCheck = ExpressionValueExtraction.extractURLValue(objectCreationExpr, 0);
 
         if (toCheck == null || objectCreationExpr == null) {
             return;

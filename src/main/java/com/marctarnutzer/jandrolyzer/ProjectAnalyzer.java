@@ -152,7 +152,7 @@ public class ProjectAnalyzer implements Runnable {
                     }
 
                     if (shouldPrintAST) {
-                        if (name.equals("ORGJSONExtractionTesting.java")) {
+                        if (name.equals("ASTExample.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -333,7 +333,7 @@ public class ProjectAnalyzer implements Runnable {
             */
         }
 
-        List<String> assembledJSONStrings = orgjsonStrategy.extract((VariableDeclarator) node, this.project);
+        List<String> assembledJSONStrings = orgjsonStrategy.extract((VariableDeclarator) node, this.project, 0);
         if (assembledJSONStrings != null) {
             String path = Utils.getPathForNode(node);
 

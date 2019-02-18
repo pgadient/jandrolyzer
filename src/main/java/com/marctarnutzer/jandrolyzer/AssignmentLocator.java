@@ -34,7 +34,7 @@ public class AssignmentLocator {
      * Returns a list of possible nodes assigned to a nameExpr between its declaration and the nameExpr access
      * location in question
      */
-    public static List<Node> nameExprGetLastAssignedNode(NameExpr nameExpr, Project project) {
+    public static List<Node> nameExprGetLastAssignedNode(NameExpr nameExpr, Project project, int depthLevel) {
         System.out.println("ASSIGNMENTLOCATOR: Get last assigned node for: " + nameExpr);
 
         ResolvedValueDeclaration resolvedValueDeclaration;
@@ -56,7 +56,7 @@ public class AssignmentLocator {
             lastAssignedNodes = getSymbolDeclarationAssignmentNodes(nameExpr, declarationNode);
         } else if (resolvedValueDeclaration instanceof JavaParserParameterDeclaration) {
             declarationNode = ((JavaParserParameterDeclaration) resolvedValueDeclaration).getWrappedNode();
-            lastAssignedNodes = getParameterDeclarationAssignmentNodes(declarationNode, project);
+            lastAssignedNodes = getParameterDeclarationAssignmentNodes(declarationNode, project, depthLevel);
         } else if (resolvedValueDeclaration instanceof JavaParserFieldDeclaration) {
             declarationNode = ((JavaParserFieldDeclaration) resolvedValueDeclaration).getWrappedNode();
             lastAssignedNodes = getFieldDeclarationAssignmentNodes(nameExpr, declarationNode, project);
@@ -199,7 +199,13 @@ public class AssignmentLocator {
         return compilationUnits;
     }
 
-    private static List<Node> getParameterDeclarationAssignmentNodes(Node declarationNode, Project project) {
+    private static List<Node> getParameterDeclarationAssignmentNodes(Node declarationNode, Project project, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return null;
+        }
+        depthLevel++;
+
         System.out.println("ASSIGNMENTLOCATOR: Parameter dec node: " + declarationNode);
 
         if (!(declarationNode instanceof Parameter)) {
@@ -319,7 +325,7 @@ public class AssignmentLocator {
                         }
                     }
 
-                    List<Node> lastAssigned = nameExprGetLastAssignedNode(argExpr.asNameExpr(), project);
+                    List<Node> lastAssigned = nameExprGetLastAssignedNode(argExpr.asNameExpr(), project, depthLevel);
                     if (lastAssigned != null) {
                         lastAssignedNodes.addAll(lastAssigned);
                     }

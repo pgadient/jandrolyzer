@@ -11,6 +11,7 @@ import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.marctarnutzer.jandrolyzer.JSONDeserializer;
+import com.marctarnutzer.jandrolyzer.Main;
 import com.marctarnutzer.jandrolyzer.Models.JSONRoot;
 import com.marctarnutzer.jandrolyzer.Models.Project;
 import com.marctarnutzer.jandrolyzer.TypeEstimator;
@@ -81,7 +82,7 @@ public class JSONStringStrategy {
 
         System.out.println("Top level BinaryExpr detected: " + binaryExpr.toString());
 
-        String serializedBinaryExpr = serializeBinaryExpr(binaryExpr);
+        String serializedBinaryExpr = serializeBinaryExpr(binaryExpr, 0);
 
         if (serializedBinaryExpr == null) {
             return false;
@@ -100,7 +101,13 @@ public class JSONStringStrategy {
         }
     }
 
-    public String serializeBinaryExpr(BinaryExpr binaryExpr) {
+    public String serializeBinaryExpr(BinaryExpr binaryExpr, int depthLevel) {
+        if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
+            System.out.println("Max depth reached.");
+            return null;
+        }
+        depthLevel++;
+
         String toReturn = null;
 
         if (!binaryExpr.getOperator().asString().equals("+")) {
@@ -111,7 +118,7 @@ public class JSONStringStrategy {
         Expression rightExpression = binaryExpr.getRight();
 
         if (leftExpression instanceof BinaryExpr) {
-            toReturn = serializeBinaryExpr(leftExpression.asBinaryExpr());
+            toReturn = serializeBinaryExpr(leftExpression.asBinaryExpr(), depthLevel);
         } else if (leftExpression instanceof StringLiteralExpr) {
             toReturn = leftExpression.asStringLiteralExpr().getValue();
         } else {
@@ -119,7 +126,7 @@ public class JSONStringStrategy {
         }
 
         if (rightExpression instanceof BinaryExpr) {
-            toReturn = toReturn + serializeBinaryExpr(rightExpression.asBinaryExpr());
+            toReturn = toReturn + serializeBinaryExpr(rightExpression.asBinaryExpr(), depthLevel);
         } else if (rightExpression instanceof StringLiteralExpr) {
             toReturn = toReturn + rightExpression.asStringLiteralExpr().getValue();
         } else {

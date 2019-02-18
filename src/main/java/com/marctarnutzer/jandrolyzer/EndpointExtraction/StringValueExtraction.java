@@ -23,7 +23,7 @@ public class StringValueExtraction {
 
         System.out.println("Detected top level BinaryExpr: " + binaryExpr);
 
-        List<String> serializedBinaryExprs = ExpressionValueExtraction.serializeBinaryExpr(binaryExpr, null);
+        List<String> serializedBinaryExprs = ExpressionValueExtraction.serializeBinaryExpr(binaryExpr, null, 0);
 
         return serializedBinaryExprs;
     }
@@ -36,7 +36,7 @@ public class StringValueExtraction {
                 /*
                  * Check if the assembled StringBuilder strings contain valid API URLs
                  */
-                List<String> potentialApiURLs = ExpressionValueExtraction.extractStringBuilderValue(variableDeclarator, project);
+                List<String> potentialApiURLs = ExpressionValueExtraction.extractStringBuilderValue(variableDeclarator, project, 0);
 
                 return potentialApiURLs;
 
@@ -57,7 +57,7 @@ public class StringValueExtraction {
 
         System.out.println("Detected rightmost concat method: " + methodCallExpr);
 
-        List<String> stringsToCheck = ExpressionValueExtraction.extractStringConcatValue(methodCallExpr, null);
+        List<String> stringsToCheck = ExpressionValueExtraction.extractStringConcatValue(methodCallExpr, null, 0);
 
         return stringsToCheck;
     }
