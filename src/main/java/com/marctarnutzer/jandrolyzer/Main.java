@@ -58,6 +58,13 @@ public class Main {
     @Parameter(names = {"-recursion_depth", "-rd"}, description = "Set max allowed recursion depth")
     public static int maxRecursionDepth = -1;
 
+    @Parameter(names = {"-output_path_json", "-oj"}, description = "Path for JSON results", variableArity = true)
+    private static List<String> outputPathJSON = new ArrayList<>();
+
+    @Parameter(names = {"-output_path_success", "-os"}, description = "Path for success state", variableArity = true)
+    private static List<String> outputPathSuccess = new ArrayList<>();
+
+
     // HashSet not ordered according to insertion order
     static HashMap<String, HashSet<String>> libraries;
 
@@ -67,25 +74,26 @@ public class Main {
         Main main = new Main();
         JCommander.newBuilder().addObject(main).build().parse(args);
 
-        if (!projectPath.isEmpty()) {
-            analyzeSingleProject(argToPath(projectPath), argToPath(librariesPath));
+        if (!projectPath.isEmpty() && !outputPathJSON.isEmpty()) {
+            analyzeSingleProject(argToPath(projectPath), argToPath(librariesPath), argToPath(outputPathJSON));
         } else if (!projectsPath.isEmpty()) {
+            // the method below should become deprecated (no distinct output folders supported)
             analyzeMultipleProjects(argToPath(projectsPath), argToPath(librariesPath));
         } else if (!apkPath.isEmpty()) {
-            if (jadxPath.isEmpty() || outputPath.isEmpty()) {
-                throw new IllegalArgumentException("Please specify JADX path and output path.");
+            if (jadxPath.isEmpty() || outputPath.isEmpty() || outputPathSuccess.isEmpty()) {
+                throw new IllegalArgumentException("Please specify JADX path, output path, output path for JSON results, and output path for success state.");
             }
-
-            analyzeSingleAPK(argToPath(apkPath), argToPath(jadxPath), argToPath(outputPath), argToPath(librariesPath));
+            analyzeSingleAPK(argToPath(apkPath), argToPath(jadxPath), argToPath(outputPath), argToPath(librariesPath), argToPath(outputPathJSON), argToPath(outputPathSuccess));
         } else if (!apksPath.isEmpty()) {
-            if (jadxPath.isEmpty() || outputPath.isEmpty()) {
-                throw new IllegalArgumentException("Please specify JADX path and output path.");
+            if (jadxPath.isEmpty() || outputPath.isEmpty() || outputPathSuccess.isEmpty()) {
+                throw new IllegalArgumentException("Please specify JADX path, output path, output path for JSON results, and output path for success state.");
             }
 
-            analyzeMultipleAPKs(argToPath(apksPath), argToPath(jadxPath), argToPath(outputPath),
-                    argToPath(librariesPath));
-        } else if (!analyzedProjectPath.isEmpty()) {
-            analyzeAPIs(null, argToPath(analyzedProjectPath));
+            analyzeMultipleAPKs(argToPath(apksPath), argToPath(jadxPath), argToPath(outputPath), argToPath(librariesPath), argToPath(outputPathJSON), argToPath(outputPathSuccess));
+        } else if (!analyzedProjectPath.isEmpty() && !outputPathJSON.isEmpty()) {
+            analyzeAPIs(null, argToPath(analyzedProjectPath), argToPath(outputPathJSON));
+        } else {
+            System.out.println("Warning: Invalid parameter configuration found. Aborting.");
         }
 
         System.out.println("All done!");
@@ -93,6 +101,10 @@ public class Main {
 
     private static String argToPath(List<String> arg) {
         StringBuilder stringBuilder = new StringBuilder();
+
+        if (arg.isEmpty()) {
+            return "";
+        }
 
         for (String partPath : arg) {
             stringBuilder.append(partPath + "\\ ");
@@ -109,34 +121,34 @@ public class Main {
         return path;
     }
 
-    static void analyzeMultipleAPKs(String pathToAPKsFolder, String pathToJadx, String outputPath, String librariesPath) {
-        Decompiler decompiler = new Decompiler(null, pathToAPKsFolder, pathToJadx, outputPath);
+    static void analyzeMultipleAPKs(String pathToAPKsFolder, String pathToJadx, String outputPath, String librariesPath, String jsonPath, String successPath) {
+        Decompiler decompiler = new Decompiler(null, pathToAPKsFolder, pathToJadx, outputPath, successPath);
         ArrayList<String> projectPathsList = decompiler.startDecompilation();
 
         if (!projectPathsList.isEmpty()) {
             for (String path : projectPathsList) {
                 if (!decompilationOnly) {
-                    analyzeSingleProject(path, librariesPath);
+                    analyzeSingleProject(path, librariesPath, jsonPath);
                 }
             }
         }
     }
 
     // outputPath specifies the location of the decompiled Android project
-    static void analyzeSingleAPK(String pathToAPK, String pathToJadx, String outputPath, String librariesPath) {
-        Decompiler decompiler = new Decompiler(pathToAPK, null, pathToJadx, outputPath);
+    static void analyzeSingleAPK(String pathToAPK, String pathToJadx, String outputPath, String librariesPath, String jsonPath, String successPath) {
+        Decompiler decompiler = new Decompiler(pathToAPK, null, pathToJadx, outputPath, successPath);
         ArrayList<String> projectPathList = decompiler.startDecompilation();
 
         if (!projectPathList.isEmpty()) {
             if (!decompilationOnly) {
-                analyzeSingleProject(projectPathList.get(0), librariesPath);
+                analyzeSingleProject(projectPathList.get(0), librariesPath, jsonPath);
             }
         } else {
             System.out.println("ProjectPathList is empty");
         }
     }
 
-    static void analyzeSingleProject(String projectPath, String librariesPath) {
+    static void analyzeSingleProject(String projectPath, String librariesPath, String jsonPath) {
         List<Project> projects = new LinkedList<>();
 
         try {
@@ -148,11 +160,11 @@ public class Main {
 
         System.out.println(projects.get(0).minimalStringRepresentation());
 
-        analyzeAPIs(projects, null);
+        analyzeAPIs(projects, null, jsonPath);
     }
 
-    static void analyzeAPIs(List<Project> projects, String projectPath) {
-        APIAnalyzer apiAnalyzer = new APIAnalyzer(projects, httpRequests, projectPath);
+    static void analyzeAPIs(List<Project> projects, String projectPath, String jsonPath) {
+        APIAnalyzer apiAnalyzer = new APIAnalyzer(projects, httpRequests, projectPath, jsonPath);
         apiAnalyzer.analyzeAll();
     }
 

@@ -24,6 +24,7 @@ public class APIAnalyzer {
 
     private List<Project> projects;
     private String projectPath;
+    private String jsonFolderPath;
     private boolean shouldMakeHttpRequests;
     private Set<String> httpMethods = new HashSet<>(Arrays.asList(
             "GET",
@@ -38,10 +39,11 @@ public class APIAnalyzer {
             .build();
     public ConcurrentLinkedQueue<RequestResponse> requestResponses = new ConcurrentLinkedQueue<>();
 
-    public APIAnalyzer(List<Project> projects, boolean shouldMakeHttpRequests, String projectPath) {
+    public APIAnalyzer(List<Project> projects, boolean shouldMakeHttpRequests, String projectPath, String jsonPath) {
         this.projects = projects;
         this.shouldMakeHttpRequests = shouldMakeHttpRequests;
         this.projectPath = projectPath;
+        this.jsonFolderPath = jsonPath;
     }
 
     public void analyzeAll() {
@@ -71,10 +73,14 @@ public class APIAnalyzer {
      * for later processing.
      */
     private void prepareData(Project project) throws IOException {
+        Path pathJsonStorage = Paths.get(this.jsonFolderPath, new File(project.path).getName() + ".json");
         Path path = Paths.get(project.path, "extractedData.jan");
         BufferedWriter writer = new BufferedWriter(new FileWriter(path.toString()));
+        BufferedWriter writerStorage = new BufferedWriter(new FileWriter(pathJsonStorage.toString()));
         writer.write("ENDPOINTS:");
         writer.newLine();
+        writerStorage.write("ENDPOINTS:");
+        writerStorage.newLine();
 
 
         List<String> nonPopulatedURLs = new LinkedList<>();
@@ -121,10 +127,17 @@ public class APIAnalyzer {
             writer.newLine();
             writer.write(populatedURLs.get(i));
             writer.newLine();
+
+            writerStorage.write(nonPopulatedURLs.get(i));
+            writerStorage.newLine();
+            writerStorage.write(populatedURLs.get(i));
+            writerStorage.newLine();
         }
 
         writer.write("JSON:");
         writer.newLine();
+        writerStorage.write("JSON:");
+        writerStorage.newLine();
 
         for (JSONRoot jsonRoot : project.jsonModels.values()) {
             String nonPopulatedJSONString = jsonRoot.formatJSONWithoutValues();
@@ -134,10 +147,17 @@ public class APIAnalyzer {
             writer.newLine();
             writer.write(populatedJSONString);
             writer.newLine();
+
+            writerStorage.write(nonPopulatedJSONString);
+            writerStorage.newLine();
+            writerStorage.write(populatedJSONString);
+            writerStorage.newLine();
         }
 
         writer.write("STRING VARIABLES:");
         writer.newLine();
+        writerStorage.write("STRING VARIABLES:");
+        writerStorage.newLine();
 
         for (Map.Entry<String, Set<String>> entry : project.stringVariables.entrySet()) {
             JSONArray jsonArray = new JSONArray();
@@ -149,30 +169,42 @@ public class APIAnalyzer {
 
             writer.write(jsonObject.toString());
             writer.newLine();
+            writerStorage.write(jsonObject.toString());
+            writerStorage.newLine();
         }
 
         writer.write("JSON DETAILS:");
         writer.newLine();
+        writerStorage.write("JSON DETAILS:");
+        writerStorage.newLine();
 
         for (JSONRoot jsonRoot : project.jsonModels.values()) {
             writer.write(jsonRoot.getJSONDetails());
+            writerStorage.write(jsonRoot.getJSONDetails());
         }
 
         writer.write("URL DETAILS:");
         writer.newLine();
+        writerStorage.write("URL DETAILS:");
+        writerStorage.newLine();
 
         for (APIURL apiurl : project.apiURLs.values()) {
             writer.write(apiurl.toString());
+            writerStorage.write(apiurl.toString());
         }
 
         writer.write("SNIPPETS:");
         writer.newLine();
+        writerStorage.write("SNIPPETS:");
+        writerStorage.newLine();
 
         for (Snippet snippet : project.snippets) {
             writer.write(snippet.toString());
+            writerStorage.write(snippet.toString());
         }
 
         writer.close();
+        writerStorage.close();
 
         System.out.println("Saved data");
     }

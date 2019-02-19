@@ -18,14 +18,16 @@ public class Decompiler {
     private String pathToAPKsFolder;
     private String pathToJadx;
     private String outputPath;
+    private String successPath;
     //private Timer timer = new Timer();
     private boolean timerRanOut = false;
 
-    public Decompiler(String pathToAPK, String pathToAPKsFolder, String pathToJadx, String outputPath) {
+    public Decompiler(String pathToAPK, String pathToAPKsFolder, String pathToJadx, String outputPath, String successPath) {
         this.pathToAPK = pathToAPK;
         this.pathToAPKsFolder = pathToAPKsFolder;
         this.pathToJadx = pathToJadx;
         this.outputPath = outputPath;
+        this.successPath = successPath;
     }
 
     public ArrayList<String> startDecompilation() {
@@ -129,21 +131,36 @@ public class Decompiler {
             return;
         }
 
-        String fileName;
-        if (jadxSuccess) {
-            fileName = "noJadxErrors";
-        } else {
-            fileName = "hasJadxErrors";
-        }
-        if (timerRanOut) {
-            fileName = "abortedDecompilation";
-        }
+        String fileName = new File(decompiledProjectPath).getName() + ".success";
+        //String fileName;
+        //if (jadxSuccess) {
+        //    fileName = "noJadxErrors";
+        //} else {
+        //    fileName = "hasJadxErrors";
+        //}
+        //if (timerRanOut) {
+        //    fileName = "abortedDecompilation";
+        //}
 
-        Path filePath = Paths.get(decompiledProjectPath, fileName);
-
+        Path filePath = Paths.get(successPath, fileName);
         File file = new File(filePath.toString());
         try {
             file.createNewFile();
+            FileWriter fw = new FileWriter(file);
+            BufferedWriter bw = new BufferedWriter(fw);
+
+            if (jadxSuccess) {
+                bw.write("noJadxErrors");
+            } else {
+                if (timerRanOut) {
+                    bw.write(fileName = "abortedDecompilation");
+                } else {
+                    bw.write("hasJadxErrors");
+                }
+            }
+
+            bw.close();
+            fw.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
