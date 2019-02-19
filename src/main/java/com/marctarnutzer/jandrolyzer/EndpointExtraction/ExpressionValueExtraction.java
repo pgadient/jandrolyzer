@@ -555,7 +555,13 @@ public class ExpressionValueExtraction {
     public static List<String> getExpressionValue(Expression expression, Set<Node> seenExpressions, int depthLevel) {
         if (Main.maxRecursionDepth != -1 && Main.maxRecursionDepth <= depthLevel) {
             System.out.println("Max depth reached.");
-            return null;
+
+            String typeString = solvedExpressionType(expression);
+            if (typeString != null) {
+                return Arrays.asList(typeString);
+            } else {
+                return null;
+            }
         }
         depthLevel++;
 

@@ -137,8 +137,6 @@ public class Main {
     }
 
     static void analyzeSingleProject(String projectPath, String librariesPath) {
-        System.out.println("Recursion depth: " + maxRecursionDepth);
-
         List<Project> projects = new LinkedList<>();
 
         try {
