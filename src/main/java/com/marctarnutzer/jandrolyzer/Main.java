@@ -49,7 +49,7 @@ public class Main {
     @Parameter(names = {"--libraries_path", "-lp"}, description = "Location of libraries", required = true)
     private static List<String> librariesPath = new ArrayList<>();
 
-    @Parameter(names = {"-httpRequests", "-http"}, description = "Make HTTP requests to collected to endpoints")
+    @Parameter(names = {"-httpRequests", "-http"}, description = "Make HTTP requests to collected endpoints")
     private static boolean httpRequests = false;
 
     @Parameter(names = {"-decompilation_only", "-do"}, description = "Run decompilation only")

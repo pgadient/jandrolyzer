@@ -221,6 +221,7 @@ public class ExpressionValueExtraction {
         List<String> potentialApiURLs = new LinkedList<>();
         Stack<List<String>> chainedValuesStack = new Stack<>();
         for (MethodCallExpr methodCallExpr : methodCallExprs) {
+            // Comment the next 3 lines if execution time is not an issue
             if (potentialApiURLs.size() > 100) {
                 return potentialApiURLs;
             }

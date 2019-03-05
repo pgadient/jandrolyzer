@@ -241,8 +241,6 @@ public class OkHttpStrategy {
                 }
             }
 
-            // TODO: Add functionality for unknown values to ExpressionValueExtraction.getExpressionValue()
-
             if (methodCallExpr.getScope().get().isMethodCallExpr()) {
                 return extractRequest(methodCallExpr.getScope().get().asMethodCallExpr(), foundURLs, extractedHttpMethod);
             }

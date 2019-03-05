@@ -103,8 +103,10 @@ public class APIURLStrategy {
                     }
                 }
 
+                project.apiURLs.get(baseURL).library = apiurl.library;
                 project.apiURLs.get(baseURL).endpoints.get(apiEndpoint.path).httpMethods.addAll(apiEndpoint.httpMethods);
             } else {
+                project.apiURLs.get(baseURL).library = apiurl.library;
                 project.apiURLs.get(baseURL).endpoints.put(apiEndpoint.path, apiEndpoint);
             }
         } else {

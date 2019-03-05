@@ -42,7 +42,7 @@ import java.io.*;
 import java.nio.file.Path;
 import java.util.*;
 
-public class ProjectAnalyzer implements Runnable {
+public class ProjectAnalyzer {
 
     private Project project;
     private File projectFolder;
@@ -134,6 +134,7 @@ public class ProjectAnalyzer implements Runnable {
             try {
                 sourceRoot.tryToParse();
                 compilationUnits = sourceRoot.getCompilationUnits();
+                this.project.compilationUnits.clear();
                 this.project.compilationUnits.addAll(compilationUnits);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -151,6 +152,7 @@ public class ProjectAnalyzer implements Runnable {
                         continue;
                     }
 
+                    /*
                     if (shouldPrintAST) {
                         if (name.equals("ASTExample.java")) {
                             DotPrinter printer = new DotPrinter(true);
@@ -164,6 +166,7 @@ public class ProjectAnalyzer implements Runnable {
                             //System.out.println(name);
                         }
                     }
+                    */
 
                     LinkedList<String> foundLibraries = analyzeImports(compilationUnit);
 
@@ -391,8 +394,9 @@ public class ProjectAnalyzer implements Runnable {
                             String expressionType = estimateType(expression);
                             if (expressionType != null) {
                                 System.out.println("Argument type: " + expressionType);
-                                //argTypes.add(expressionType);
-                                //TODO: Expressions like e.g. new Response.Listener<String>() { ... } can not be resolved here, have to contact JavaParser maintainers
+                                // argTypes.add(expressionType);
+                                // Expressions like e.g. new Response.Listener<String>() { ... } can not be resolved here,
+                                // have to contact JavaParser maintainers
                                 // Instead of Response.Listener and response error, lambda expressions can be used...
                             }
                             */
@@ -400,7 +404,6 @@ public class ProjectAnalyzer implements Runnable {
                             if (((ObjectCreationExpr) expression).getType().asString().contains("Response.Listener")) {
                                 System.out.println("Type arguments: " +
                                         ((ObjectCreationExpr) expression).getType().getTypeArguments().get());
-                                // TODO: Type arguments can be used later for JSONObject structure etc.
                                 argTypes.add("Response.Listener");
                             }
                         }
@@ -413,7 +416,7 @@ public class ProjectAnalyzer implements Runnable {
                 }
                 break;
             case "Builder":
-                typeString = estimateType((Expression) node);
+                typeString = TypeEstimator.estimateTypeName((Expression) node);
                 if (typeString != null) {
                     if (typeString.equals("okhttp3.Request.Builder")) {
                         saveSnippet(path, name, "com.squareup.okhttp3", typeString, node);
@@ -428,13 +431,13 @@ public class ProjectAnalyzer implements Runnable {
                 }
                 break;
             case "Socket": // Library: java.net.Socket
-                typeString = estimateType((Expression) node);
+                typeString = TypeEstimator.estimateTypeName((Expression) node);
                 if (typeString.equals("java.net.Socket")) {
                     saveSnippet(path, name, typeString, typeString, node);
                 }
                 break;
             case "SSLSocket": // Library: javax.net.ssl.SSLSocket
-                typeString = estimateType((Expression) node);
+                typeString = TypeEstimator.estimateTypeName((Expression) node);
                 if (typeString.equals("javax.net.ssl.SSLSocket")) {
                     saveSnippet(path, name, typeString, typeString, node);
                 }
@@ -452,7 +455,7 @@ public class ProjectAnalyzer implements Runnable {
         String typeString = null;
         switch(((MethodCallExpr) node).getName().asString()) {
             case "openConnection": case "openStream": // Libraries: java.net.HttpURLConnection, java.net.URLConnection
-                typeString = estimateType((Expression) node);
+                typeString = TypeEstimator.estimateTypeName((Expression) node);
                 if (typeString != null) {
                     if (typeString.equals("java.net.URLConnection")) {
                         saveSnippet(path, name, "java.net.URLConnection", typeString, node);
@@ -463,7 +466,7 @@ public class ProjectAnalyzer implements Runnable {
                 break;
             case "execute": // Libraries: org.apache.httpcomponents, android.net.http
                 if (((MethodCallExpr) node).getScope().isPresent()) {
-                    String scopeType = estimateType(((MethodCallExpr) node).getScope().get());
+                    String scopeType = TypeEstimator.estimateTypeName(((MethodCallExpr) node).getScope().get());
                     if (scopeType != null) {
                         if (scopeType.equals("org.apache.http.client.HttpClient")
                                 || scopeType.equals("org.apache.http.impl.client.CloseableHttpClient ")
@@ -476,11 +479,12 @@ public class ProjectAnalyzer implements Runnable {
                 }
                 break;
             case "get": case "post": // Libraries: com.loopj.android
-                //typeString = estimateType((Expression) node); // TODO: This does not work for com.loopj.android, even though the parameters are resolved successfully
+                // This does not work for com.loopj.android, even though the parameters are resolved successfully
+                //typeString = estimateType((Expression) node);
                 if (((MethodCallExpr) node).getArguments().size() >= 2) {
                     LinkedList<String> argTypes = new LinkedList<>();
                     for (Expression expression : ((MethodCallExpr) node).getArguments()) {
-                        String expressionType = estimateType(expression);
+                        String expressionType = TypeEstimator.estimateTypeName(expression);
                         if (expressionType != null) {
                             argTypes.add(expressionType);
                         }
@@ -491,11 +495,11 @@ public class ProjectAnalyzer implements Runnable {
                 }
                 break;
             case "with": // com.github.bumptech.glide
-                typeString = estimateType((Expression) node);
+                typeString = TypeEstimator.estimateTypeName((Expression) node);
                 if (typeString != null && typeString.equals("com.koushikdutta.ion.builder.LoadBuilder")) {
                     saveSnippet(path, name, "com.koushikdutta.ion", typeString, node);
                 } else if (((MethodCallExpr) node).getScope().isPresent()) {
-                    String scopeType = estimateType(((MethodCallExpr) node).getScope().get());
+                    String scopeType = TypeEstimator.estimateTypeName(((MethodCallExpr) node).getScope().get());
                     if (scopeType != null) {
                         if (scopeType.equals("com.bumptech.glide.Glide")) {
                             saveSnippet(path, name, "com.github.bumptech.glide", scopeType, node);
@@ -550,8 +554,8 @@ public class ProjectAnalyzer implements Runnable {
                 if (((CastExpr) node).getExpression() instanceof MethodCallExpr) {
                     switch (((MethodCallExpr) ((CastExpr) node).getExpression()).getName().asString()) {
                         case "openConnection": case "openStream":
-                            String methodCallType = estimateType(((CastExpr) node).getExpression());
-                            String castType = estimateType((Expression) node);
+                            String methodCallType = TypeEstimator.estimateTypeName(((CastExpr) node).getExpression());
+                            String castType = TypeEstimator.estimateTypeName((Expression) node);
                             if (methodCallType != null) {
                                 if (methodCallType.equals("java.net.URLConnection")) {
                                     saveSnippet(path, name, castType, castType, node);
@@ -585,45 +589,6 @@ public class ProjectAnalyzer implements Runnable {
         }
     }
 
-    private String estimateType(Expression expr) {
-        String typeString = null;
-
-        //System.out.println("Code: " + expr.toString());
-
-        try {
-            if (expr instanceof MethodCallExpr) {
-                ResolvedType resolvedType = expr.calculateResolvedType();
-                typeString = resolvedType.asReferenceType().getQualifiedName();
-
-                //System.out.println("[RESOLVED] MethodCallExpr was resolved to: " + typeString);
-            } else if (expr instanceof ObjectCreationExpr) {
-                ResolvedType resolvedType = expr.calculateResolvedType();
-                typeString = resolvedType.asReferenceType().getQualifiedName();
-
-                //System.out.println("[RESOLVED] ObjectCreationExpr was resolved to: " + typeString);
-            } else if (expr instanceof  CastExpr) {
-                typeString = expr.calculateResolvedType().asReferenceType().getQualifiedName();
-
-                //System.out.println("[RESOLVED] CastExpr was resolved to: " + typeString);
-            } else if (expr instanceof NameExpr) {
-                ResolvedType resolvedType = expr.calculateResolvedType();
-                typeString = resolvedType.asReferenceType().getQualifiedName();
-
-                //System.out.println("[RESOLVED] NameExpr was resolved to : " + typeString);
-            } else {
-                //System.out.println("Expression is a: " + expr.getClass());
-            }
-        } catch (UnsolvedSymbolException e) {
-            typeString = e.getName();
-            //System.out.println("[NOT RESOLVED] was no resolved but estimated to type: " + typeString + " Exception: " + e);
-        }  catch (Exception e) {
-            typeString = null;
-            //System.out.println("[NOT RESOLVED] Exception: " + e);
-        }
-
-        return typeString;
-    }
-
     private String checkStringForNetworkingCode(String toCheck) {
         for (Map.Entry<String, HashSet<String>> entry : libraries.entrySet()) {
             for (String keyword : entry.getValue()) {
@@ -653,7 +618,6 @@ public class ProjectAnalyzer implements Runnable {
         return retNode;
     }
 
-    @Override
     public void run() {
         analyze();
 
