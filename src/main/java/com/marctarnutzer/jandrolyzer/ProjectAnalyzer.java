@@ -154,7 +154,7 @@ public class ProjectAnalyzer {
 
                     /*
                     if (shouldPrintAST) {
-                        if (name.equals("ASTExample.java")) {
+                        if (name.equals("MainActivity.java")) {
                             DotPrinter printer = new DotPrinter(true);
                             try (FileWriter fileWriter = new FileWriter("/Volumes/MTDocs/DOT/" +name + ".dot");
                                 PrintWriter printWriter = new PrintWriter(fileWriter)) {
@@ -167,6 +167,7 @@ public class ProjectAnalyzer {
                         }
                     }
                     */
+
 
                     LinkedList<String> foundLibraries = analyzeImports(compilationUnit);
 
@@ -207,7 +208,7 @@ public class ProjectAnalyzer {
                     return;
                 }
 
-                Arrays.sort(libraryFolders);
+                Arrays.sort(libraryFolders, Collections.reverseOrder());
                 for (File file : libraryFolders) {
                     if (file.getName().contains(entry.getKey())) {
                         symbolSolverCollectionStrategy.collect(file.toPath());
@@ -319,7 +320,7 @@ public class ProjectAnalyzer {
         if (assembledStringsSV != null) {
             String path = Utils.getPathForNode(node);
 
-            boolean isValidURL = apiurlStrategy.extract(assembledStringsSV, this.project, "noLib", path);
+            boolean isValidURL = apiurlStrategy.extract(assembledStringsSV, this.project, "noLib.StringBuilder", path);
 
             /*
             if (isValidURL) {
@@ -327,7 +328,7 @@ public class ProjectAnalyzer {
             }
             */
 
-            boolean isValidJSON = jsonStringStrategy.extract(assembledStringsSV, this.project, "noLib", path);
+            boolean isValidJSON = jsonStringStrategy.extract(assembledStringsSV, this.project, "noLib.StringBuilder", path);
 
             /*
             if (isValidJSON) {

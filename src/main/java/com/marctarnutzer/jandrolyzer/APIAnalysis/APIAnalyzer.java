@@ -249,7 +249,10 @@ public class APIAnalyzer {
                 if (httpMethod.equals("GET")) {
                     System.out.println("Testing URL: " + endpoint + " [" + httpMethod + "]");
                     makeRequest(httpUrl, null, httpMethod, requestResponses, latch);
-                } else if (httpMethod.equals("POST")) {
+                } else if (httpMethod.equals("POST")
+                        || httpMethod.equals("PATCH")
+                        || httpMethod.equals("PUT")
+                        || httpMethod.equals("DELETE")) {
                     System.out.println("Testing URL: " + endpoint + " [" + httpMethod + "]");
                     makeRequest(httpUrl, null, httpMethod, requestResponses, latch);
 
