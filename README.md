@@ -55,7 +55,7 @@ Decompilation process completed.
 Decompiled project path: .\decompiled\sample.apk, jadxSuccess: true, timer ran out: false
 Analyzing project: .\decompiled\sample.apk
 WARNING: An illegal reflective access operation has occurred
-\<...\> (errors and warnings during the decompilation process)
+<...> (more errors and warnings during the decompilation process)
 Found libraries: {android.core=23}
 Added library: .\libraries\android.core-23
 1 detected JSON models:
@@ -63,7 +63,7 @@ Added library: .\libraries\android.core-23
 Processed: 1 of 1
 Name:
 sample.apk
-\<...\> (extracted web API data with corresponding code snippets)
+<...> (extracted web API data with corresponding code snippets)
 Analyzing API endpoints of project: sample.apk
 Preparing data...
 Saved data
@@ -87,7 +87,7 @@ Path:
 Library:
 org.json
 JSON Object: 
-{"advertisingId":"\<STRING\>","buildId":"\<STRING\>","appVersionName":"\<STRING\>","type":"\<STRING\>","appVersionCode":"\<STRING\>","limitAdTrackingEnabled":\<BOOLEAN\>,"betaDeviceToken":"\<STRING\>","executionId":"\<STRING\>","customType":"\<STRING\>","osVersion":"\<STRING\>","predefinedType":"\<STRING\>","appBundleId":"\<STRING\>","deviceModel":"\<STRING\>","installationId":"\<STRING\>","androidId":"\<STRING\>"}
+{"advertisingId":"<STRING>","buildId":"<STRING>","appVersionName":"<STRING>","type":"<STRING>","appVersionCode":"<STRING>","limitAdTrackingEnabled":"<BOOLEAN>","betaDeviceToken":"<STRING>","executionId":"<STRING>","customType":"<STRING>","osVersion":"<STRING>","predefinedType":"<STRING>","appBundleId":"<STRING>","deviceModel":"<STRING>","installationId":"<STRING>","androidId":"<STRING>"}
 <...> (web API URLs with corresponding query parameters)
 <...> (relevant code snippets)
 ```
