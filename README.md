@@ -33,10 +33,13 @@ The tool supports these optional parameters:
 - **ONLY USE THE FEATURE BELOW WHEN YOU ARE AWARE OF THE POSSIBLE IMPLICATIONS.**
   
   `http` Can be set to `true` or `false`. Enables HTTP requests for the collected web APIs. 
-  
+
+### Example
 A typical command for the analysis of a single APK file looks like:
 
-`java -jar jandrolyzer.jar -lp ./libraries -ap sample.apk -jp ./jadx/bin/jadx.bat -op ./decompiled -oj ./json -os ./state`
+```
+java -jar jandrolyzer.jar -lp ./libraries -ap sample.apk -jp ./jadx/bin/jadx.bat -op ./decompiled -oj ./json -os ./state
+```
 
 The tool supports current Debian and Windows operating systems and requires at least Java 8, respectively Java 12 for the compiled jar file in the `/bin` folder.
 
