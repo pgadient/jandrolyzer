@@ -23,14 +23,72 @@ The tool requires the following parameters:
 The tool supports these optional parameters:
 - `asp` Used instead of `ap`. The path to a folder containing APK files to be analysed.
 - `do` Decompilation only.
-- `app` Analyzes web API server responses of an already analyzed project. **ONLY USE FEATURE WHEN YOU KNOW THE POTENTIAL IMPLICATIONS. USE IT WITH EXTREME CARE!**
 - `pp` Used instead of `ap` or `asp`. The folder path to a single open-source app project to be analysed. 
-- `psp` Used instead of `ap` or `asp`. The folder path that contains multiple open-source app projects to be analysed.  
-- `http` Initiates HTTP requests for the collected web APIs. **ONLY USE FEATURE WHEN YOU KNOW THE POTENTIAL IMPLICATIONS. USE IT WITH EXTREME CARE!**
-- `rd` Sets the maximal allowed recursion depth for variable resolving. `-1` can be used for unlimited recursion depth.
+- `psp` Used instead of `ap` or `asp`. The folder path that contains multiple open-source app projects to be analysed.
+- `rd` Sets the maximal allowed recursion depth for variable resolving. `-1` can be used for unlimited recursion depth.  
+- **ONLY USE THE FEATURE BELOW WHEN YOU ARE AWARE OF THE POSSIBLE IMPLICATIONS.**
+    
+  `app` Analyzes web API server responses of an already analyzed project. Requires the parameter `http` set to be `true`.
 
+- **ONLY USE THE FEATURE BELOW WHEN YOU ARE AWARE OF THE POSSIBLE IMPLICATIONS.**
+  
+  `http` Can be set to `true` or `false`. Enables HTTP requests for the collected web APIs. 
+  
 A typical command for the analysis of a single APK file looks like:
 
 `java -jar jandrolyzer.jar -lp ./libraries -ap sample.apk -jp ./jadx/bin/jadx.bat -op ./decompiled -oj ./json -os ./state`
 
-The tool supports current Debian and Windows operating systems and requires at least Java 8, respectively Java 12 for the compiled version.
+The tool supports current Debian and Windows operating systems and requires at least Java 8, respectively Java 12 for the compiled jar file in the `/bin` folder.
+
+## Generated output
+
+### Console
+The console output reveals errors during the analysis and presents the found web API data with the corresponding source code snippets.
+The extracted web API data is also stored in the provided JSON folder (`oj`).
+An example output for a successful analysis is shown below.
+
+<code>Starting decompilation process...<br>
+Output stream: INFO  - loading ...<br>
+Output stream: INFO  - processing ...<br>
+Output stream: INFO  - done<br>
+Decompilation process completed.<br>
+Decompiled project path: .\decompiled\sample.apk, jadxSuccess: true, timer ran out: false<br>
+Analyzing project: .\decompiled\sample.apk<br>
+WARNING: An illegal reflective access operation has occurred<br>
+\<...\> (errors and warnings during the decompilation process)<br>
+Found libraries: {android.core=23}<br>
+Added library: .\libraries\android.core-23<br>
+1 detected JSON models:<br>
+2 detected base API URLs:<br>
+Processed: 1 of 1<br>
+Name:<br>
+sample.apk<br>
+\<...\> (extracted web API data with corresponding code snippets)<br>
+Analyzing API endpoints of project: sample.apk<br>
+Preparing data...<br>
+Saved data<br>
+All done!</code>
+
+### Decompilation folder (`op`)
+This folder contains the source code of the decompiled APK file.
+
+### JSON folder (`oj`)
+This folder contains the reconstructed JSON data structures. The detected data type is provided for each variable.
+If a value could be traced back to a certain JSON variable, the resolved value is provided in place. An example is shown below.
+
+<code><...> (found web API URLs)<br>
+<...> (found JSON key-value pairs)<br>
+<...> (found String variables with assigned values)<br>
+JSON DETAILS:<br>
+Path:<br>
+/home/decompiled/sample.apk/src/main/java/com/crashlytics/android/answers/SessionEventTransform.java<br>
+Library:<br>
+org.json<br>
+JSON Object:<br> 
+{"advertisingId":"\<STRING\>","buildId":"\<STRING\>","appVersionName":"\<STRING\>","type":"\<STRING\>","appVersionCode":"\<STRING\>","limitAdTrackingEnabled":\<BOOLEAN\>,"betaDeviceToken":"\<STRING\>","executionId":"\<STRING\>","customType":"\<STRING\>","osVersion":"\<STRING\>","predefinedType":"\<STRING\>","appBundleId":"\<STRING\>","deviceModel":"\<STRING\>","installationId":"\<STRING\>","androidId":"\<STRING\>"}<br>
+<...> (web API URLs with corresponding query parameters)<br>
+<...> (relevant code snippets)</code>
+
+
+### State folder (`os`)
+This folder contains a file for each analysis that indicates whether the decompilation process and the subsequent analysis task succeeded. For example, `hasJadxErrors` indicates that the decompilation process skipped some class files, crashed, or had been terminated. `noJadxErrors` indicates that the decompilation process finished successfully.
