@@ -47,27 +47,28 @@ The console output reveals errors during the analysis and presents the found web
 The extracted web API data is also stored in the provided JSON folder (`oj`).
 An example output for a successful analysis is shown below.
 
-<code>Starting decompilation process...\
-Output stream: INFO  - loading ...\
-Output stream: INFO  - processing ...\
-Output stream: INFO  - done\
-Decompilation process completed.\
-Decompiled project path: .\decompiled\sample.apk, jadxSuccess: true, timer ran out: false\
-Analyzing project: .\decompiled\sample.apk\
-WARNING: An illegal reflective access operation has occurred\
-\<...\> (errors and warnings during the decompilation process)\
-Found libraries: {android.core=23}\
-Added library: .\libraries\android.core-23\
-1 detected JSON models:\
-2 detected base API URLs:\
-Processed: 1 of 1\
-Name:\
-sample.apk\
-\<...\> (extracted web API data with corresponding code snippets)\
-Analyzing API endpoints of project: sample.apk\
-Preparing data...\
-Saved data\
-All done!</code>
+```Starting decompilation process...
+Output stream: INFO  - loading ...
+Output stream: INFO  - processing ...
+Output stream: INFO  - done
+Decompilation process completed.
+Decompiled project path: .\decompiled\sample.apk, jadxSuccess: true, timer ran out: false
+Analyzing project: .\decompiled\sample.apk
+WARNING: An illegal reflective access operation has occurred
+\<...\> (errors and warnings during the decompilation process)
+Found libraries: {android.core=23}
+Added library: .\libraries\android.core-23
+1 detected JSON models:
+2 detected base API URLs:
+Processed: 1 of 1
+Name:
+sample.apk
+\<...\> (extracted web API data with corresponding code snippets)
+Analyzing API endpoints of project: sample.apk
+Preparing data...
+Saved data
+All done!
+```
 
 ### Decompilation folder (`op`)
 This folder contains the source code of the decompiled APK file.
@@ -76,18 +77,20 @@ This folder contains the source code of the decompiled APK file.
 This folder contains the reconstructed JSON data structures. The detected data type is provided for each variable.
 If a value could be traced back to a certain JSON variable, the resolved value is provided in place. An example is shown below.
 
-<code><...> (found web API URLs)\
-<...> (found JSON key-value pairs)\
-<...> (found String variables with assigned values)\
-JSON DETAILS:\
-Path:\
-/home/decompiled/sample.apk/src/main/java/com/crashlytics/android/answers/SessionEventTransform.java\
-Library:\
-org.json\
-JSON Object:\ 
-{"advertisingId":"\<STRING\>","buildId":"\<STRING\>","appVersionName":"\<STRING\>","type":"\<STRING\>","appVersionCode":"\<STRING\>","limitAdTrackingEnabled":\<BOOLEAN\>,"betaDeviceToken":"\<STRING\>","executionId":"\<STRING\>","customType":"\<STRING\>","osVersion":"\<STRING\>","predefinedType":"\<STRING\>","appBundleId":"\<STRING\>","deviceModel":"\<STRING\>","installationId":"\<STRING\>","androidId":"\<STRING\>"}\
-<...> (web API URLs with corresponding query parameters)\
-<...> (relevant code snippets)</code>
+```
+<...> (found web API URLs)
+<...> (found JSON key-value pairs)
+<...> (found String variables with assigned values)
+JSON DETAILS:
+Path:
+/home/decompiled/sample.apk/src/main/java/com/crashlytics/android/answers/SessionEventTransform.java
+Library:
+org.json
+JSON Object: 
+{"advertisingId":"\<STRING\>","buildId":"\<STRING\>","appVersionName":"\<STRING\>","type":"\<STRING\>","appVersionCode":"\<STRING\>","limitAdTrackingEnabled":\<BOOLEAN\>,"betaDeviceToken":"\<STRING\>","executionId":"\<STRING\>","customType":"\<STRING\>","osVersion":"\<STRING\>","predefinedType":"\<STRING\>","appBundleId":"\<STRING\>","deviceModel":"\<STRING\>","installationId":"\<STRING\>","androidId":"\<STRING\>"}
+<...> (web API URLs with corresponding query parameters)
+<...> (relevant code snippets)
+```
 
 
 ### State folder (`os`)
