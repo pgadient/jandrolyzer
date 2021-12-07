@@ -4,7 +4,8 @@ It supports the validation of found data. Use that feature with care as it could
 
 The tool relies on JADX and JavaParser.
 
-> This is the accompanying material for our publication titled “Mining Web APIs in Android Applications”.
+> This is the accompanying material for the publication titled “Web APIs in Android through the Lens of Security” that has been presented at the 27th IEEE International Conference on Software Analysis, Evolution and Reengineering (SANER 2020). The preprint can be downloaded [here](https://arxiv.org/abs/2001.00195) and a presentation that builds on the results of this tool is available [here](https://www.youtube.com/watch?v=Ylgu-0CFUXA).
+
 
 ## Usage
 
